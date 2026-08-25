@@ -47,10 +47,9 @@ it("refuses a foreign folder with 404, not 403", () => {
 
 ```ts
 // concurrency is the point of the test — issue the requests in parallel
-cy.wrap(Promise.allSettled([createFolder("Reports"), createFolder("reports")]))
-  .then((results) => {
-    expect(results.filter(fulfilled)).to.have.length(1);
-  });
+cy.wrap(Promise.allSettled([createFolder("Reports"), createFolder("reports")])).then((results) => {
+  expect(results.filter(fulfilled)).to.have.length(1);
+});
 ```
 
 ## Anti-patterns

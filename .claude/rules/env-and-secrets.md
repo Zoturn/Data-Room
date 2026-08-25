@@ -14,7 +14,7 @@ paths:
 
 1. Every variable is declared in one zod schema per app and read only through the typed config service. `process.env.X` outside that schema is forbidden — it bypasses validation and hides the variable from `.env.example`.
 2. The API validates its environment at boot and exits non-zero on a missing or malformed value. Failing at first request instead means a broken deploy looks healthy.
-3. Adding a variable means adding it to the schema *and* to `.env.example` with a non-secret placeholder, in the same commit.
+3. Adding a variable means adding it to the schema _and_ to `.env.example` with a non-secret placeholder, in the same commit.
 4. `.env` files are never committed. Only `.env.example` is tracked.
 5. Secrets never reach the browser. In `apps/web` only `NEXT_PUBLIC_`-prefixed values are readable client-side, and nothing prefixed that way may be a credential.
 6. The Supabase **service** key is server-side only, in `apps/api`. It grants full bucket access; treat it as a root credential.

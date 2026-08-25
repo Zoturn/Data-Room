@@ -40,14 +40,14 @@ Requests arrive at a controller, which validates and delegates to a service, whi
 
 ## Rules
 
-| Rule | Covers |
-|---|---|
-| [nestjs-architecture.md](.claude/rules/nestjs-architecture.md) | modules, the controller → service → repository layering, DI |
-| [prisma-data-model.md](.claude/rules/prisma-data-model.md) | schema conventions, the node tree, indexes, migrations |
-| [auth-and-guards.md](.claude/rules/auth-and-guards.md) | sessions, cookie policy including local development, default-deny guards |
-| [sharing-authorization.md](.claude/rules/sharing-authorization.md) | access resolution — the security boundary of the product |
-| [file-upload-storage.md](.claude/rules/file-upload-storage.md) | signed URLs, the upload pipeline, blob lifecycle |
-| [errors-and-validation.md](.claude/rules/errors-and-validation.md) | DTOs, domain errors, the exception filter |
-| [testing.md](.claude/rules/testing.md) | Jest for units, Cypress for HTTP; nothing else |
+| Rule                                                               | Covers                                                                   |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------ |
+| [nestjs-architecture.md](.claude/rules/nestjs-architecture.md)     | modules, the controller → service → repository layering, DI              |
+| [prisma-data-model.md](.claude/rules/prisma-data-model.md)         | schema conventions, the node tree, indexes, migrations                   |
+| [auth-and-guards.md](.claude/rules/auth-and-guards.md)             | sessions, cookie policy including local development, default-deny guards |
+| [sharing-authorization.md](.claude/rules/sharing-authorization.md) | access resolution — the security boundary of the product                 |
+| [file-upload-storage.md](.claude/rules/file-upload-storage.md)     | signed URLs, the upload pipeline, blob lifecycle                         |
+| [errors-and-validation.md](.claude/rules/errors-and-validation.md) | DTOs, domain errors, the exception filter                                |
+| [testing.md](.claude/rules/testing.md)                             | Jest for units, Cypress for HTTP; nothing else                           |
 
 Repository-wide rules — API contract, TypeScript, environment, git — are indexed in the root [CLAUDE.md](../../CLAUDE.md).

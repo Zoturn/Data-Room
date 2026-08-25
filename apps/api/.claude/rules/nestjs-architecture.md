@@ -19,7 +19,7 @@ paths:
 4. Repositories own every Prisma call for their aggregate. Nothing outside a repository imports `PrismaService`.
 5. Cross-module access goes through the other module's exported service, never through its repository and never through a direct Prisma query into its tables.
 6. Constructor injection only, with `readonly` parameters. No service locators, no circular imports resolved with `forwardRef` unless the cycle is genuinely intrinsic — it usually means a missing third module.
-7. Guards decide *may this caller proceed*; services decide *what happens*. Do not re-check ownership inside a service that a guard already established, and do not put business rules in a guard.
+7. Guards decide _may this caller proceed_; services decide _what happens_. Do not re-check ownership inside a service that a guard already established, and do not put business rules in a guard.
 8. Multi-write operations run inside one transaction, opened by the repository, not stitched together in a service.
 9. Register cross-cutting concerns once, globally: the validation pipe, the exception filter, the request-id middleware, the auth guard. Never per-controller.
 10. A service method reads as a sentence of domain language — `resolveAccess`, `deleteSubtree`, `setCurrentVersion` — not as `handleRequest` or `process`.

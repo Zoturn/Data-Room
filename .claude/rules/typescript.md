@@ -20,7 +20,7 @@ paths:
 7. Model states as discriminated unions rather than several optional booleans, so impossible states cannot be represented.
 8. Name things for what they are: no `data`, `info`, `handleStuff`, `tmp`, or numeric suffixes.
 9. Export what is used elsewhere and nothing more. An exported symbol is an API someone will depend on.
-10. Comment *why*, never *what*. Code that needs a "what" comment needs a better name instead.
+10. Comment _why_, never _what_. Code that needs a "what" comment needs a better name instead.
 11. Async functions return typed results and throw typed errors; a rejected promise must never carry a bare string.
 
 ## Examples

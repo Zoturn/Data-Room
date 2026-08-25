@@ -18,7 +18,7 @@ paths:
 6. Size is enforced twice: at intent from the declared size, and at commit from the object's real size. Only the second one is trustworthy.
 7. A failed commit deletes both the reservation and the uploaded object. A file that cannot be validated must leave nothing behind.
 8. Signed URLs are short-lived and single-purpose. Never log a full signed URL, never cache one past its expiry, and never hand one user a URL minted for another.
-9. Check access *before* signing a download URL. Signing first and authorising afterwards has already leaked the object.
+9. Check access _before_ signing a download URL. Signing first and authorising afterwards has already leaked the object.
 10. Blob deletion is best-effort and idempotent, performed after the metadata transaction commits. A storage failure must not roll back a delete the user has confirmed; record the key and let the sweep retry it.
 11. The sweep expires stale `PENDING` reservations and retries failed deletions. It must be safe to run twice and must never touch a `READY` node. It runs in-process today — with more than one instance it needs a lock or an external scheduler.
 12. `PENDING` nodes are excluded from every listing, search and share query. A reservation is not a file.
@@ -32,8 +32,14 @@ export interface SignedUpload {
 }
 
 export abstract class StorageService {
-  abstract createUploadUrl(key: string, opts: { contentType: string; maxBytes: number }): Promise<SignedUpload>;
-  abstract createDownloadUrl(key: string, opts: { fileName: string; ttlSeconds: number }): Promise<string>;
+  abstract createUploadUrl(
+    key: string,
+    opts: { contentType: string; maxBytes: number },
+  ): Promise<SignedUpload>;
+  abstract createDownloadUrl(
+    key: string,
+    opts: { fileName: string; ttlSeconds: number },
+  ): Promise<string>;
   abstract readRange(key: string, start: number, end: number): Promise<Buffer>;
   abstract statObject(key: string): Promise<{ sizeBytes: number } | null>;
   abstract deleteObject(key: string): Promise<void>;

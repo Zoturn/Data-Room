@@ -1,10 +1,10 @@
 ## 1. Workspace and tooling
 
-- [ ] 1.1 Initialise the pnpm workspace: root `package.json`, `pnpm-workspace.yaml` covering `apps/*` and `packages/*`, `.gitignore`, `.nvmrc`
-- [ ] 1.2 Add the shared base `tsconfig.json` with `strict: true`, `noUncheckedIndexedAccess` and path aliases; extend it in each workspace
-- [ ] 1.3 Add ESLint (flat config) and Prettier at the root, plus the import-boundary rule that forbids `apps/web` ↔ `apps/api` imports
-- [ ] 1.4 Add root scripts: `dev`, `build`, `typecheck`, `lint`, `test`, `e2e`
-- [ ] 1.5 Add a `check:test-runners` script that fails when a dependency outside Jest/Cypress appears in any workspace, and wire it into `lint`
+- [x] 1.1 Initialise the pnpm workspace: root `package.json`, `pnpm-workspace.yaml` covering `apps/*` and `packages/*`, `.gitignore`, `.nvmrc`
+- [x] 1.2 Add the shared base `tsconfig.json` with `strict: true`, `noUncheckedIndexedAccess` and path aliases; extend it in each workspace
+- [x] 1.3 Add ESLint (flat config) and Prettier at the root, plus the import-boundary rule that forbids `apps/web` ↔ `apps/api` imports
+- [x] 1.4 Add root scripts: `dev`, `build`, `typecheck`, `lint`, `test`, `e2e`
+- [x] 1.5 Add a `check:test-runners` script that fails when a dependency outside Jest/Cypress appears in any workspace, and wire it into `lint`
 
 ## 2. Shared contract package
 
@@ -40,14 +40,14 @@
 
 ## 6. Documentation and automation
 
-- [ ] 6.1 Write the root `CLAUDE.md`: purpose, stack, directory map, commands, rule index, hook table, change order
-- [ ] 6.2 Write `apps/api/CLAUDE.md` and `apps/web/CLAUDE.md` — orientation and rule index only
-- [ ] 6.3 Write the shared rules: `openspec-workflow`, `git-workflow`, `typescript`, `env-and-secrets`, `api-contract`
-- [ ] 6.4 Write the backend rules: `nestjs-architecture`, `prisma-data-model`, `errors-and-validation`, `testing`
-- [ ] 6.5 Write the frontend rules: `nextjs-app-router`, `components`, `tailwind-shadcn`, `data-fetching`, `forms-and-validation`, `ux-states`, `accessibility`, `testing`
-- [ ] 6.6 Write the hook scripts under `.claude/hooks/`: `format.sh`, `test-companion.sh`, `post-commit-tests.sh`, `docs-sync.sh`, `spec-guard.sh`
-- [ ] 6.7 Wire the hooks in `.claude/settings.json` and verify each script by piping a sample payload, including the no-`node_modules` case
-- [ ] 6.8 Write the README skeleton: overview, setup, environment, scripts, and placeholders for ERD, How it scales, hosted URLs and the AI-usage note
+- [x] 6.1 Write the root `CLAUDE.md`: purpose, stack, directory map, commands, rule index, hook table, change order
+- [x] 6.2 Write `apps/api/CLAUDE.md` and `apps/web/CLAUDE.md` — orientation and rule index only
+- [x] 6.3 Write the shared rules: `openspec-workflow`, `git-workflow`, `typescript`, `env-and-secrets`, `api-contract`
+- [x] 6.4 Write the backend rules: `nestjs-architecture`, `prisma-data-model`, `errors-and-validation`, `testing`
+- [x] 6.5 Write the frontend rules: `nextjs-app-router`, `components`, `tailwind-shadcn`, `data-fetching`, `forms-and-validation`, `ux-states`, `accessibility`, `testing`
+- [x] 6.6 Write the hook scripts under `.claude/hooks/`: `format.sh`, `test-companion.sh`, `post-commit-tests.sh`, `docs-sync.sh`, `spec-guard.sh`
+- [x] 6.7 Wire the hooks in `.claude/settings.json` and verify each script by piping a sample payload, including the no-`node_modules` case
+- [x] 6.8 Write the README skeleton: overview, setup, environment, scripts, and placeholders for ERD, How it scales, hosted URLs and the AI-usage note
 
 ## 7. CI and deployment
 

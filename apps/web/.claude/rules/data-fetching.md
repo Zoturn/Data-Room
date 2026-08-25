@@ -18,7 +18,7 @@ paths:
 4. Query keys are hierarchical and declared in one place per feature: `["folders", folderId, "children", params]`. Never inline an ad-hoc key at a call site.
 5. Lists use `useInfiniteQuery` with the `nextCursor` from the response. Never fabricate a cursor and never fall back to page numbers.
 6. Mutations invalidate the narrowest key that could have changed — the affected folder's children and the ancestor aggregates, not the whole cache.
-7. Optimistic updates are for renames and moves, where the outcome is predictable. Always implement the rollback, and reconcile with the server's response: an upload or rename may come back with a *different* name than requested, and the UI must show what actually happened.
+7. Optimistic updates are for renames and moves, where the outcome is predictable. Always implement the rollback, and reconcile with the server's response: an upload or rename may come back with a _different_ name than requested, and the UI must show what actually happened.
 8. Never optimistically apply a delete of a folder subtree. Wait for confirmation — the operation is destructive and irreversible.
 9. Uploads do not use this client. Progress requires `XMLHttpRequest`; that transport lives in the upload module and is the single documented exception.
 10. Set `staleTime` deliberately per query. Folder contents are short-lived; the session is longer; a signed content URL must never be cached past its expiry.
@@ -31,7 +31,8 @@ paths:
 export const folderKeys = {
   all: ["folders"] as const,
   detail: (id: string) => [...folderKeys.all, id] as const,
-  children: (id: string, params: ListParams) => [...folderKeys.detail(id), "children", params] as const,
+  children: (id: string, params: ListParams) =>
+    [...folderKeys.detail(id), "children", params] as const,
 };
 ```
 
@@ -39,7 +40,9 @@ export const folderKeys = {
 // single-flight refresh — concurrent 401s share one rotation
 let refreshInFlight: Promise<void> | null = null;
 function refreshOnce() {
-  refreshInFlight ??= doRefresh().finally(() => { refreshInFlight = null; });
+  refreshInFlight ??= doRefresh().finally(() => {
+    refreshInFlight = null;
+  });
   return refreshInFlight;
 }
 ```
@@ -51,7 +54,7 @@ onSuccess: (result) => {
     toast.info(`Saved as "${result.name}" because that name was taken`);
   }
   queryClient.invalidateQueries({ queryKey: folderKeys.children(parentId) });
-}
+};
 ```
 
 ## Anti-patterns

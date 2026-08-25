@@ -8,11 +8,11 @@ Built for the GS1 full-stack take-home task.
 
 ## Hosted URLs
 
-| | URL |
-|---|---|
-| Frontend | _(pending — `add-project-foundation`)_ |
-| Backend | _(pending — `add-project-foundation`)_ |
-| Health check | _(pending)_ `/api/health` |
+|              | URL                                    |
+| ------------ | -------------------------------------- |
+| Frontend     | _(pending — `add-project-foundation`)_ |
+| Backend      | _(pending — `add-project-foundation`)_ |
+| Health check | _(pending)_ `/api/health`              |
 
 _A short tour of what to try first is added with the final change._
 
@@ -26,14 +26,14 @@ _A short tour of what to try first is added with the final change._
 
 ## Stack
 
-| | |
-|---|---|
-| Frontend | Next.js 15 (App Router), React, TypeScript, Tailwind, shadcn/ui, TanStack Query |
-| Backend | NestJS 11, Prisma, PostgreSQL |
-| Storage | Supabase — Postgres and Storage |
-| Auth | Argon2id passwords and Google OAuth, JWT access + rotating refresh in httpOnly cookies |
-| Testing | Jest (units, services) and Cypress (API, components, end-to-end) |
-| Hosting | Vercel (web), Railway or Render (api), Supabase (data and blobs) |
+|          |                                                                                        |
+| -------- | -------------------------------------------------------------------------------------- |
+| Frontend | Next.js 15 (App Router), React, TypeScript, Tailwind, shadcn/ui, TanStack Query        |
+| Backend  | NestJS 11, Prisma, PostgreSQL                                                          |
+| Storage  | Supabase — Postgres and Storage                                                        |
+| Auth     | Argon2id passwords and Google OAuth, JWT access + rotating refresh in httpOnly cookies |
+| Testing  | Jest (units, services) and Cypress (API, components, end-to-end)                       |
+| Hosting  | Vercel (web), Railway or Render (api), Supabase (data and blobs)                       |
 
 ## Design decisions
 
@@ -98,14 +98,14 @@ Conventions live in `.claude/rules/*.md` and load automatically for the files th
 
 ### Roadmap
 
-| Order | Change | Status |
-|---|---|---|
-| 1 | `add-project-foundation` | specified |
-| 2 | `add-authentication` | specified |
-| 3 | `add-data-room-tree` | specified |
-| 4 | `add-file-management` | specified |
-| 5 | `add-sharing` | specified |
-| 6 | `add-search-and-versioning` | specified (extra credit) |
+| Order | Change                      | Status                   |
+| ----- | --------------------------- | ------------------------ |
+| 1     | `add-project-foundation`    | specified                |
+| 2     | `add-authentication`        | specified                |
+| 3     | `add-data-room-tree`        | specified                |
+| 4     | `add-file-management`       | specified                |
+| 5     | `add-sharing`               | specified                |
+| 6     | `add-search-and-versioning` | specified (extra credit) |
 
 ## Use of AI
 

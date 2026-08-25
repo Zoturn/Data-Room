@@ -42,14 +42,14 @@ openspec validate --all --strict
 
 Changes are built in this order, each archived before the next begins:
 
-| Order | Change | Delivers |
-|---|---|---|
-| 1 | `add-project-foundation` | monorepo, contract, env, health, CI, deployment |
-| 2 | `add-authentication` | email/password and Google sign-in, sessions |
-| 3 | `add-data-room-tree` | Data Room, folders, breadcrumbs, recursive delete |
-| 4 | `add-file-management` | upload, view, rename, move, delete |
-| 5 | `add-sharing` | public links, permissioned shares, revocation |
-| 6 | `add-search-and-versioning` | extra credit, plus the final README |
+| Order | Change                      | Delivers                                          |
+| ----- | --------------------------- | ------------------------------------------------- |
+| 1     | `add-project-foundation`    | monorepo, contract, env, health, CI, deployment   |
+| 2     | `add-authentication`        | email/password and Google sign-in, sessions       |
+| 3     | `add-data-room-tree`        | Data Room, folders, breadcrumbs, recursive delete |
+| 4     | `add-file-management`       | upload, view, rename, move, delete                |
+| 5     | `add-sharing`               | public links, permissioned shares, revocation     |
+| 6     | `add-search-and-versioning` | extra credit, plus the final README               |
 
 ## Rules
 
@@ -57,13 +57,13 @@ Every convention lives in a rule file and loads automatically for the paths it c
 
 **Both sides — [.claude/rules/](.claude/rules/)**
 
-| Rule | Covers |
-|---|---|
-| [openspec-workflow.md](.claude/rules/openspec-workflow.md) | proposing, specifying, applying and archiving a change |
-| [api-contract.md](.claude/rules/api-contract.md) | endpoint shapes, the error envelope, cursor pagination |
-| [typescript.md](.claude/rules/typescript.md) | strictness, no `any`, shared inferred types |
-| [env-and-secrets.md](.claude/rules/env-and-secrets.md) | configuration, `.env.example`, what must never ship to a browser |
-| [git-workflow.md](.claude/rules/git-workflow.md) | branches, commits, pull requests, migrations |
+| Rule                                                       | Covers                                                           |
+| ---------------------------------------------------------- | ---------------------------------------------------------------- |
+| [openspec-workflow.md](.claude/rules/openspec-workflow.md) | proposing, specifying, applying and archiving a change           |
+| [api-contract.md](.claude/rules/api-contract.md)           | endpoint shapes, the error envelope, cursor pagination           |
+| [typescript.md](.claude/rules/typescript.md)               | strictness, no `any`, shared inferred types                      |
+| [env-and-secrets.md](.claude/rules/env-and-secrets.md)     | configuration, `.env.example`, what must never ship to a browser |
+| [git-workflow.md](.claude/rules/git-workflow.md)           | branches, commits, pull requests, migrations                     |
 
 **Backend — [apps/api/.claude/rules/](apps/api/.claude/rules/)** · indexed in [apps/api/CLAUDE.md](apps/api/CLAUDE.md)
 
@@ -73,13 +73,13 @@ Every convention lives in a rule file and loads automatically for the paths it c
 
 Repeated actions are hooks in [.claude/settings.json](.claude/settings.json), never instructions in a rule. They run whether or not anyone remembers them, and no-op in a clone with no dependencies installed.
 
-| Hook | Fires | Does |
-|---|---|---|
-| [spec-guard.sh](.claude/hooks/spec-guard.sh) | before a write | refuses hand edits to `openspec/specs/**`, which `openspec archive` generates |
-| [format.sh](.claude/hooks/format.sh) | after a write | Prettier, using the nearest workspace's own config |
-| [test-companion.sh](.claude/hooks/test-companion.sh) | after a source write | reports a missing or stale companion spec so tests follow the change |
-| [post-commit-tests.sh](.claude/hooks/post-commit-tests.sh) | after `git commit` | runs Jest for the workspaces the commit touched |
-| [docs-sync.sh](.claude/hooks/docs-sync.sh) | after `openspec archive` | revalidates specs, checks every rule path resolves, flags stale README sections |
+| Hook                                                       | Fires                    | Does                                                                            |
+| ---------------------------------------------------------- | ------------------------ | ------------------------------------------------------------------------------- |
+| [spec-guard.sh](.claude/hooks/spec-guard.sh)               | before a write           | refuses hand edits to `openspec/specs/**`, which `openspec archive` generates   |
+| [format.sh](.claude/hooks/format.sh)                       | after a write            | Prettier, using the nearest workspace's own config                              |
+| [test-companion.sh](.claude/hooks/test-companion.sh)       | after a source write     | reports a missing or stale companion spec so tests follow the change            |
+| [post-commit-tests.sh](.claude/hooks/post-commit-tests.sh) | after `git commit`       | runs Jest for the workspaces the commit touched                                 |
+| [docs-sync.sh](.claude/hooks/docs-sync.sh)                 | after `openspec archive` | revalidates specs, checks every rule path resolves, flags stale README sections |
 
 ## Testing
 
@@ -87,4 +87,4 @@ Jest and Cypress only. Jest for logic and services, Cypress for HTTP, components
 
 ## Documentation
 
-A `CLAUDE.md` carries orientation and a rule index. Conventions, examples and detail go in a rule. If something here starts explaining *how* to do something, it belongs in a rule instead.
+A `CLAUDE.md` carries orientation and a rule index. Conventions, examples and detail go in a rule. If something here starts explaining _how_ to do something, it belongs in a rule instead.

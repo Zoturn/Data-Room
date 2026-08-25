@@ -17,7 +17,7 @@ paths:
 3. Success responses return the resource or `{ items, nextCursor }`. Do not wrap successes in a `{ success: true, data }` envelope — the status code already says it worked.
 4. Every failure returns exactly this envelope: `{ code, message, details?, requestId }`. `code` is a stable `SCREAMING_SNAKE_CASE` member of the shared union; `message` is for a human; `details` carries one entry per invalid field.
 5. Add a new error `code` to the shared union first. A code the client cannot exhaustively handle is a code that will be rendered as "something went wrong".
-6. Status codes carry meaning: 400 validation, 401 unauthenticated, 404 not found *or not permitted*, 409 conflict, 413 too large, 429 rate limited, 500 unexpected. Never 403 — it confirms that a resource exists.
+6. Status codes carry meaning: 400 validation, 401 unauthenticated, 404 not found _or not permitted_, 409 conflict, 413 too large, 429 rate limited, 500 unexpected. Never 403 — it confirms that a resource exists.
 7. Lists are cursor-paginated, always. `limit` has a default and a hard maximum; `nextCursor` is an opaque string and is `null` on the last page. Clients must not construct or parse a cursor.
 8. Timestamps are ISO 8601 UTC strings. Sizes are bytes as numbers. Ids are strings and opaque — never parse meaning out of one.
 9. Do not put anything sensitive in a URL: no emails, no tokens in query strings that end up in logs. Share tokens travel in the path only for public links, which is their purpose.

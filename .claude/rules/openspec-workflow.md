@@ -11,7 +11,7 @@ paths:
 ## Rules
 
 1. Behaviour changes start as a change proposal, not as code. Run `openspec new change <kebab-name>` and fill `proposal.md` → `specs/<capability>/spec.md` → `design.md` → `tasks.md`, in that order. Each artifact is the input to the next.
-2. Write the proposal about *why*, the specs about *what*, the design about *how*, and the tasks about *in what order*. A "how" in the proposal or a "why" in the tasks means the content is in the wrong file.
+2. Write the proposal about _why_, the specs about _what_, the design about _how_, and the tasks about _in what order_. A "how" in the proposal or a "why" in the tasks means the content is in the wrong file.
 3. Name capabilities in kebab-case, one capability per `specs/<name>/spec.md`. Reuse an existing capability name from `openspec/specs/` when the behaviour belongs to it.
 4. Format requirements exactly as `### Requirement: <name>` with SHALL or MUST, and scenarios as `#### Scenario: <name>` — **four hashtags**, with `- **WHEN**` and `- **THEN**` bullets. Three hashtags parse as prose and the scenario vanishes without an error.
 5. Give every requirement at least one scenario, and cover the failure or edge case as well as the happy path. A requirement with only a happy path is an untested requirement.
@@ -35,6 +35,7 @@ A well-formed scenario:
 
 ```markdown
 #### Scenario: Colliding rename is refused
+
 - **WHEN** the new name matches a sibling after normalisation
 - **THEN** the response is 409 with `code: "NAME_CONFLICT"` and the folder keeps its old name
 ```

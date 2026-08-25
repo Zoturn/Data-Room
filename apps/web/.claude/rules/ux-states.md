@@ -35,9 +35,8 @@ return <FolderContentsList items={items} />;
 
 ```tsx
 <AlertDialogDescription>
-  Deleting <strong>{folder.name}</strong> permanently removes{" "}
-  {preview.folders} folders and {preview.files} files ({formatBytes(preview.bytes)}).
-  This cannot be undone.
+  Deleting <strong>{folder.name}</strong> permanently removes {preview.folders} folders and{" "}
+  {preview.files} files ({formatBytes(preview.bytes)}). This cannot be undone.
 </AlertDialogDescription>
 ```
 

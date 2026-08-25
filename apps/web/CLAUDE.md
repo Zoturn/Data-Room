@@ -39,15 +39,15 @@ The brief grades user experience first, so loading, empty, error and destructive
 
 ## Rules
 
-| Rule | Covers |
-|---|---|
-| [nextjs-app-router.md](.claude/rules/nextjs-app-router.md) | routing, route groups, server vs client components, URL state |
-| [components.md](.claude/rules/components.md) | granularity, composition, feature layout, capabilities as props |
-| [tailwind-shadcn.md](.claude/rules/tailwind-shadcn.md) | tokens, utilities, owning the shadcn primitives |
-| [data-fetching.md](.claude/rules/data-fetching.md) | the API client, query keys, single-flight refresh, mutations |
-| [forms-and-validation.md](.claude/rules/forms-and-validation.md) | react-hook-form with shared zod schemas, error rendering |
-| [ux-states.md](.claude/rules/ux-states.md) | loading, empty, error, destructive confirmations, upload progress |
-| [accessibility.md](.claude/rules/accessibility.md) | keyboard, focus, labelling, announcements |
-| [testing.md](.claude/rules/testing.md) | Jest for logic, Cypress for components and flows; nothing else |
+| Rule                                                             | Covers                                                            |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------- |
+| [nextjs-app-router.md](.claude/rules/nextjs-app-router.md)       | routing, route groups, server vs client components, URL state     |
+| [components.md](.claude/rules/components.md)                     | granularity, composition, feature layout, capabilities as props   |
+| [tailwind-shadcn.md](.claude/rules/tailwind-shadcn.md)           | tokens, utilities, owning the shadcn primitives                   |
+| [data-fetching.md](.claude/rules/data-fetching.md)               | the API client, query keys, single-flight refresh, mutations      |
+| [forms-and-validation.md](.claude/rules/forms-and-validation.md) | react-hook-form with shared zod schemas, error rendering          |
+| [ux-states.md](.claude/rules/ux-states.md)                       | loading, empty, error, destructive confirmations, upload progress |
+| [accessibility.md](.claude/rules/accessibility.md)               | keyboard, focus, labelling, announcements                         |
+| [testing.md](.claude/rules/testing.md)                           | Jest for logic, Cypress for components and flows; nothing else    |
 
 Repository-wide rules — API contract, TypeScript, environment, git — are indexed in the root [CLAUDE.md](../../CLAUDE.md).

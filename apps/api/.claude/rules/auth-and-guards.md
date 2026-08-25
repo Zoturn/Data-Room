@@ -23,21 +23,21 @@ paths:
 9. Google sign-in requires `email_verified`. Match on the normalised email and link to the existing user; never create a second account for the same address. Validate the OAuth `state` on every callback.
 10. The Google callback sets cookies and redirects to the frontend. It never returns JSON — the browser is mid-navigation.
 11. `@CurrentUser()` is the only way a handler obtains the caller. Do not read `request.user` directly in a service.
-12. Guards answer *may this caller proceed* and nothing else. Resolving what a share permits belongs to the access resolver; see `sharing-authorization.md`.
+12. Guards answer _may this caller proceed_ and nothing else. Resolving what a share permits belongs to the access resolver; see `sharing-authorization.md`.
 13. Rate-limit register, login, refresh and the public share surface. The limiter is per-instance in memory today — with more than one instance it needs a shared store, and that is a real change, not a config tweak.
 
 ## Local development with httpOnly cookies
 
 The production pair is genuinely cross-site — `app.vercel.app` calling `api.onrender.com` — so it needs `SameSite=None`, and browsers only accept that with `Secure`, which needs HTTPS. Locally there is no HTTPS, so the same settings would silently drop every cookie: the login response appears to succeed, and the next request arrives anonymous.
 
-Locally the pair is **not** cross-site. `localhost:3000` and `localhost:3001` differ only by port, and port is not part of a *site* — so `SameSite=Lax` cookies are sent on credentialed requests between them. That is what makes local development work without certificates.
+Locally the pair is **not** cross-site. `localhost:3000` and `localhost:3001` differ only by port, and port is not part of a _site_ — so `SameSite=Lax` cookies are sent on credentialed requests between them. That is what makes local development work without certificates.
 
-| | Local | Production |
-|---|---|---|
-| `httpOnly` | `true` | `true` |
-| `Secure` | `false` | `true` |
-| `SameSite` | `lax` | `none` |
-| `domain` | unset | unset |
+|            | Local   | Production |
+| ---------- | ------- | ---------- |
+| `httpOnly` | `true`  | `true`     |
+| `Secure`   | `false` | `true`     |
+| `SameSite` | `lax`   | `none`     |
+| `domain`   | unset   | unset      |
 
 Both sides still need the credentialed-CORS handshake, which is easy to get wrong in either environment:
 
@@ -83,7 +83,9 @@ export const Public = () => SetMetadata(IS_PUBLIC_KEY, true);
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard("jwt") {
-  constructor(private readonly reflector: Reflector) { super(); }
+  constructor(private readonly reflector: Reflector) {
+    super();
+  }
 
   canActivate(ctx: ExecutionContext) {
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [

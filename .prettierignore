@@ -1,0 +1,10 @@
+node_modules
+dist
+build
+.next
+coverage
+pnpm-lock.yaml
+
+# OpenSpec artifacts are parsed by the CLI — heading depth and bullet form are
+# load-bearing, so Prettier does not touch them.
+openspec

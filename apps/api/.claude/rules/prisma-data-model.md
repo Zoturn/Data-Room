@@ -19,7 +19,7 @@ paths:
 6. `normalizedName` is written by one shared normalisation function (trim, Unicode-normalise, lower-case). Two call sites normalising differently is a latent duplicate.
 7. Index for the queries that exist: `(parentId, type, name, id)` for listing and its cursor, `(dataRoomId, path)` with `text_pattern_ops` for subtree prefix scans, unique `(token)` for shares, a GIN trigram index on `lower(name)` for search. Adding a query means checking the plan, not guessing.
 8. Subtree work is one prefix query — aggregate, delete, search — never a recursive walk and never a query per level.
-9. Wrap multi-row writes in `$transaction`. Collect the storage keys of files being deleted *before* the delete, and release blobs after the commit.
+9. Wrap multi-row writes in `$transaction`. Collect the storage keys of files being deleted _before_ the delete, and release blobs after the commit.
 10. Migrations are additive and forward-only, one per change, with a name that says what it does. Never edit a migration that has run outside a local database.
 11. Select the columns a caller needs. Never return a `passwordHash`, a refresh token or a raw share token from a repository that feeds a response.
 12. Raw SQL is permitted where Prisma cannot express the query (prefix aggregates, trigram matching). It is parameterised, always, and lives in the repository with a comment saying why it is raw.

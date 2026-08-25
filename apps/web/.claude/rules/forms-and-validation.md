@@ -28,7 +28,7 @@ paths:
 
 ```tsx
 const form = useForm<CreateFolderInput>({
-  resolver: zodResolver(createFolderSchema),   // from packages/shared
+  resolver: zodResolver(createFolderSchema), // from packages/shared
   defaultValues: { name: "" },
 });
 
