@@ -1,0 +1,39 @@
+schema: spec-driven
+
+context: |
+  Project: Data Room — a secure, organised repository where an owner stores folders
+  and PDF documents and shares them read-only with other people (Google Drive / Dropbox
+  style). Built for the GS1 full-stack take-home task.
+
+  Monorepo (pnpm workspaces):
+    apps/web      Next.js 15 (App Router) + React 19 + TypeScript + Tailwind + shadcn/ui
+    apps/api      NestJS 11 + Prisma + PostgreSQL (Supabase) + Supabase Storage
+    packages/shared  Shared TypeScript API contract types and zod schemas
+
+  Auth: email/password (Argon2) plus Google OAuth, JWT access + rotating refresh token
+  in httpOnly cookies, enforced by NestJS guards.
+
+  Testing: Jest and Cypress ONLY. Jest for unit/integration (services, pure logic,
+  repositories). Cypress for everything crossing a boundary — API e2e via cy.request,
+  React component tests via Cypress Component Testing, and UI e2e flows.
+  Vitest, Playwright, Mocha, supertest and Testing Library are not permitted.
+
+  Conventions:
+    - Conventional Commits.
+    - Every CLAUDE.md holds general information only; details live in .claude/rules/*.md
+      and are referenced by path.
+    - Pre/post automation lives in Claude Code hooks (.claude/settings.json +
+      .claude/hooks/*.sh), never as prose instructions inside rules.
+
+rules:
+  proposal:
+    - Keep the proposal under 500 words; the "how" belongs in design.md.
+    - Always name the capabilities the change creates or modifies.
+  specs:
+    - Every requirement needs at least one scenario using exactly four hashtags (#### Scenario:).
+    - Cover the error and edge-case scenario, not just the happy path.
+  design:
+    - Record alternatives considered for each decision, not just the choice.
+  tasks:
+    - Group tasks by layer (data, backend, frontend, tests, docs) and order them by dependency.
+    - Every change ends with a task group that runs the test suites and refreshes documentation.

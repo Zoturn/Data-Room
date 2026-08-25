@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+
+# Environment — only .env.example is tracked
+.env
+.env.*
+!.env.example
+
+# Test output
+coverage/
+cypress/videos/
+cypress/screenshots/
+cypress/downloads/
+
+# Prisma
+prisma/*.db
+prisma/*.db-journal
+
+# Editors and OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Claude Code — local, per-machine permissions
+.claude/settings.local.json
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
