@@ -8,9 +8,9 @@
 
 ## 2. Shared contract package
 
-- [ ] 2.1 Create `packages/shared` with zod schemas for the error envelope (`code`, `message`, `details?`, `requestId`) and the cursor page envelope (`items`, `nextCursor`)
-- [ ] 2.2 Export inferred TypeScript types and the API error `code` union
-- [ ] 2.3 Add Jest unit tests for the schemas (accepts valid, rejects malformed)
+- [x] 2.1 Create `packages/shared` with zod schemas for the error envelope (`code`, `message`, `details?`, `requestId`) and the cursor page envelope (`items`, `nextCursor`)
+- [x] 2.2 Export inferred TypeScript types and the API error `code` union
+- [x] 2.3 Add Jest unit tests for the schemas (accepts valid, rejects malformed)
 
 ## 3. Backend skeleton
 

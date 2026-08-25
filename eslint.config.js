@@ -1,6 +1,7 @@
 import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 import prettier from "eslint-config-prettier";
+import importPlugin from "eslint-plugin-import";
 
 export default tseslint.config(
   {
@@ -39,36 +40,54 @@ export default tseslint.config(
     },
   },
 
-  // Workspace boundary: the two apps must not reach into each other.
-  // Everything they share travels through packages/shared.
+  // Workspace boundary: the two apps must not reach into each other, however the
+  // import is spelled. `no-restricted-imports` only matches the literal specifier,
+  // so a relative escape like "../../api/src/x" slips past it — `no-restricted-paths`
+  // resolves the path and catches both forms.
   {
-    files: ["apps/web/**/*.{ts,tsx}"],
+    files: ["apps/**/*.{ts,tsx}", "packages/**/*.{ts,tsx}"],
+    plugins: { import: importPlugin },
+    settings: {
+      // Without a TypeScript-aware resolver the path rule resolves nothing and
+      // passes everything silently, which is worse than not having it.
+      "import/resolver": {
+        typescript: { project: ["apps/*/tsconfig.json", "packages/*/tsconfig.json"] },
+      },
+    },
     rules: {
-      "no-restricted-imports": [
+      "import/no-restricted-paths": [
         "error",
         {
-          patterns: [
+          zones: [
             {
-              group: ["**/apps/api/**", "@data-room/api", "@data-room/api/**"],
+              target: "./apps/web",
+              from: "./apps/api",
               message:
                 "apps/web must not import from apps/api. Put shared contract types in packages/shared.",
+            },
+            {
+              target: "./apps/api",
+              from: "./apps/web",
+              message:
+                "apps/api must not import from apps/web. Put shared contract types in packages/shared.",
+            },
+            {
+              target: "./packages",
+              from: "./apps",
+              message: "packages/* must not depend on an app; the dependency runs the other way.",
             },
           ],
         },
       ],
-    },
-  },
-  {
-    files: ["apps/api/**/*.ts"],
-    rules: {
+      // The package-name form of the same mistake.
       "no-restricted-imports": [
         "error",
         {
           patterns: [
             {
-              group: ["**/apps/web/**", "@data-room/web", "@data-room/web/**"],
+              group: ["@data-room/api", "@data-room/api/**", "@data-room/web", "@data-room/web/**"],
               message:
-                "apps/api must not import from apps/web. Put shared contract types in packages/shared.",
+                "The apps must not import each other. Put shared contract types in packages/shared.",
             },
           ],
         },
