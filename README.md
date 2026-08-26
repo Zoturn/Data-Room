@@ -88,7 +88,47 @@ For provisioning Supabase, Vercel and the API host, follow **[docs/deployment.md
 
 ## Environment
 
-_(pending — every variable is listed in `.env.example` with a placeholder. The API validates them at boot and refuses to start if one is missing.)_
+Every variable is declared in one zod schema per app and read only through a typed config
+service — nothing else touches `process.env`. The API validates at boot and **exits naming
+whatever is missing**, so a half-configured deploy fails loudly instead of serving confusing
+errors at the first request.
+
+Copy `apps/api/.env.example` → `apps/api/.env` and `apps/web/.env.example` →
+`apps/web/.env.local`.
+
+**`apps/api`**
+
+| Variable          | Notes                                                                                                              |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `NODE_ENV`        | `development` \| `test` \| `production`                                                                            |
+| `PORT`            | Defaults to 3001. Leave unset on a host that injects it.                                                           |
+| `DATABASE_URL`    | Pooled connection used at runtime (Supabase port 6543, `?pgbouncer=true`)                                          |
+| `DIRECT_URL`      | Direct connection for migrations (port 5432) — a transaction pooler cannot hold the session `prisma migrate` needs |
+| `WEB_APP_URL`     | Where the browser app runs; OAuth redirects return here                                                            |
+| `CORS_ORIGINS`    | Comma-separated origins allowed to send credentialed requests                                                      |
+| `COOKIE_SECURE`   | `false` locally, `true` in production                                                                              |
+| `COOKIE_SAMESITE` | `lax` locally, `none` in production                                                                                |
+
+**`apps/web`**
+
+| Variable              | Notes                                        |
+| --------------------- | -------------------------------------------- |
+| `NEXT_PUBLIC_API_URL` | The API base **including the `/api` suffix** |
+
+Two of these are worth understanding rather than copying:
+
+- **Cookie policy is configuration, not code.** Production is genuinely cross-site — Vercel
+  calling the API host — so it needs `SameSite=None`, which browsers accept only alongside
+  `Secure`, which needs HTTPS. Locally the two differ only by port, and a port is not part of
+  a _site_, so `Lax` without `Secure` is both sufficient and correct. `httpOnly` is
+  unconditional in every environment.
+- **Origins are compared exactly.** A trailing slash on `CORS_ORIGINS` would match nothing,
+  because a browser's `Origin` header never carries one; the schema strips it rather than
+  leaving a one-character trap whose only symptom is that every browser request fails while
+  `curl` keeps working.
+
+Secrets never reach the browser: only `NEXT_PUBLIC_`-prefixed values are readable client-side,
+and nothing prefixed that way may be a credential.
 
 ## Testing
 

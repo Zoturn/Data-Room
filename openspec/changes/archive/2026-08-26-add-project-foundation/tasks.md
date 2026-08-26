@@ -60,6 +60,6 @@
 
 ## 8. Close out
 
-- [ ] 8.1 Run `pnpm typecheck && pnpm lint && pnpm test && pnpm e2e` clean
-- [ ] 8.2 Run `openspec validate --all --strict`
-- [ ] 8.3 Archive the change and act on everything the docs-sync hook reports
+- [x] 8.1 Run `pnpm typecheck && pnpm lint && pnpm test && pnpm e2e` clean
+- [x] 8.2 Run `openspec validate --all --strict`
+- [x] 8.3 Archive the change and act on everything the docs-sync hook reports
