@@ -12,6 +12,8 @@ function guard(): OriginGuard {
       WEB_APP_URL: ALLOWED,
       CORS_ORIGINS: ALLOWED,
       JWT_ACCESS_SECRET: "a-test-secret-of-at-least-thirty-two-chars",
+      SUPABASE_URL: "https://project.supabase.co",
+      SUPABASE_SECRET_KEY: "a-test-service-role-key",
     }),
   );
 }

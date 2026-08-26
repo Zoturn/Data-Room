@@ -11,6 +11,7 @@ import type {
 } from "@data-room/shared";
 import type { AuthUser } from "../auth/jwt-auth.guard";
 import { DomainError, NotFoundError, ValidationFailedError } from "../common/errors/domain-error";
+import { BlobReleaseService } from "../files/blob-release.service";
 import { FoldersRepository, toNodeSummary, type NodeRecord } from "./folders.repository";
 
 /**
@@ -48,7 +49,13 @@ export class MaxDepthExceededError extends DomainError {
  */
 @Injectable()
 export class FoldersService {
-  constructor(private readonly tree: FoldersRepository) {}
+  constructor(
+    private readonly tree: FoldersRepository,
+    // Reached through the seam `FilesModule` exports rather than by talking to storage here:
+    // deleting a folder is the one operation in this module that frees objects, and it must
+    // free them the same way a file deletion does (nestjs-architecture.md rule 5).
+    private readonly blobs: BlobReleaseService,
+  ) {}
 
   async createFolder(user: AuthUser, input: CreateFolderInput): Promise<NodeSummary> {
     const parent = await this.requireFolder(user, input.parentId);
@@ -132,10 +139,11 @@ export class FoldersService {
 
     const releasedKeys = await this.tree.deleteSubtree(folder);
 
-    // TODO(add-file-management): release these blobs after the commit, best-effort and
-    // idempotent — a failed storage call must not roll back a delete that already happened,
-    // so the key goes to a sweep rather than to an exception. Always empty until files exist.
-    void releasedKeys;
+    // After the commit, never inside it: a storage outage must not roll back a deletion the
+    // owner has already confirmed. `releaseAll` swallows failures onto the sweep's queue, so
+    // this cannot throw — and until it runs, the bytes of every PDF under the folder are
+    // still sitting in the bucket with no row left pointing at them.
+    await this.blobs.releaseAll(releasedKeys);
   }
 
   /**

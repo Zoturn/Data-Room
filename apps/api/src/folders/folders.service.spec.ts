@@ -6,6 +6,7 @@ import {
   NotFoundError,
   ValidationFailedError,
 } from "../common/errors/domain-error";
+import { BlobReleaseService } from "../files/blob-release.service";
 import { FoldersRepository, ROOT_DEPTH, ROOT_PATH, type NodeRecord } from "./folders.repository";
 import { FoldersService, MAX_FOLDER_DEPTH, MaxDepthExceededError } from "./folders.service";
 
@@ -85,9 +86,24 @@ function buildRepository(): RepositoryStub {
   };
 }
 
-async function buildService(repository: RepositoryStub): Promise<FoldersService> {
+type BlobsStub = {
+  releaseAll: jest.Mock<Promise<number>, [readonly string[]]>;
+};
+
+function buildBlobs(): BlobsStub {
+  return { releaseAll: jest.fn<Promise<number>, [readonly string[]]>().mockResolvedValue(0) };
+}
+
+async function buildService(
+  repository: RepositoryStub,
+  blobs: BlobsStub = buildBlobs(),
+): Promise<FoldersService> {
   const moduleRef = await Test.createTestingModule({
-    providers: [FoldersService, { provide: FoldersRepository, useValue: repository }],
+    providers: [
+      FoldersService,
+      { provide: FoldersRepository, useValue: repository },
+      { provide: BlobReleaseService, useValue: blobs },
+    ],
   }).compile();
 
   return moduleRef.get(FoldersService);
@@ -257,6 +273,21 @@ describe("FoldersService", () => {
       expect(repository.deleteSubtree).toHaveBeenCalledWith(financials);
     });
 
+    it("releases the blob of every file the subtree contained", async () => {
+      const repository = buildRepository();
+      const keys = [`${ROOM_ID}/aaaa`, `${ROOM_ID}/bbbb`];
+      repository.deleteSubtree.mockResolvedValue(keys);
+      const blobs = buildBlobs();
+      const service = await buildService(repository, blobs);
+
+      await service.deleteFolder(OWNER, FINANCIALS_ID);
+
+      // Nothing else ever learns these keys: the rows carrying them have just been deleted,
+      // and the sweep only looks at reservations. A miss here is a PDF that stays in the
+      // bucket for good.
+      expect(blobs.releaseAll).toHaveBeenCalledWith(keys);
+    });
+
     it("leaves the tree intact when the delete fails", async () => {
       const repository = buildRepository();
       repository.deleteSubtree.mockRejectedValue(new Error("deadlock detected"));
@@ -265,6 +296,18 @@ describe("FoldersService", () => {
       // The repository runs the delete inside a transaction, so a failure here means nothing
       // was persisted. The service must not paper over it with a 204.
       await expect(service.deleteFolder(OWNER, FINANCIALS_ID)).rejects.toThrow("deadlock detected");
+    });
+
+    it("does not release any object when the delete fails", async () => {
+      const repository = buildRepository();
+      repository.deleteSubtree.mockRejectedValue(new Error("deadlock detected"));
+      const blobs = buildBlobs();
+      const service = await buildService(repository, blobs);
+
+      await expect(service.deleteFolder(OWNER, FINANCIALS_ID)).rejects.toThrow("deadlock");
+
+      // The rows are still there. Deleting their bytes would leave rows pointing at nothing.
+      expect(blobs.releaseAll).not.toHaveBeenCalled();
     });
 
     it("refuses to delete the root, which would leave a room with nothing to open", async () => {

@@ -5,8 +5,10 @@ import { AuthModule } from "./auth/auth.module";
 import { JwtAuthGuard } from "./auth/jwt-auth.guard";
 import { ConfigModule } from "./config/config.module";
 import { DataRoomModule } from "./data-room/data-room.module";
+import { FilesModule } from "./files/files.module";
 import { FoldersModule } from "./folders/folders.module";
 import { PrismaModule } from "./prisma/prisma.module";
+import { StorageModule } from "./storage/storage.module";
 import { HealthModule } from "./health/health.module";
 import { OriginGuard } from "./common/origin.guard";
 import { RequestIdMiddleware } from "./common/request-id.middleware";
@@ -38,6 +40,10 @@ const BASELINE_REQUESTS_PER_WINDOW = 300;
     }),
     AuthModule,
     DataRoomModule,
+    // Listed before FoldersModule and FilesModule because both reach storage through it, and
+    // a module that provides a dependency reads better above the two that consume it.
+    StorageModule,
+    FilesModule,
     FoldersModule,
     HealthModule,
   ],

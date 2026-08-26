@@ -64,6 +64,22 @@ const UNIQUE_VIOLATION = "P2002";
 const RECORD_NOT_FOUND = "P2025";
 
 /**
+ * Rows anything user-facing may see: every folder, and every file whose bytes have been
+ * committed. A `PENDING` row is a name reservation, not a file — it must not appear in a
+ * listing, be counted by an aggregate, or be reachable by id (file-upload-storage.md rule 12).
+ *
+ * Written as an explicit `OR` rather than `uploadState: { not: "PENDING" }` because a folder
+ * carries `NULL` there, and `NOT (upload_state = 'PENDING')` evaluates to `NULL` — not `true`
+ * — for a NULL column. That form would silently hide every folder in the room.
+ *
+ * It lives here rather than in the file module because this is the module that lists and
+ * counts nodes, and a second copy of the predicate is a second chance to forget it.
+ */
+export const COMMITTED_ONLY: Prisma.NodeWhereInput = {
+  OR: [{ uploadState: null }, { uploadState: "READY" }],
+};
+
+/**
  * Ids are UUIDs by design: the alphabet of a `path` has to be closed, or an id containing
  * `%` or `_` would make a subtree `LIKE` match past its own subtree.
  */
@@ -263,7 +279,9 @@ export class FoldersRepository {
 
     const rows = await this.prisma.node.findMany({
       where:
-        after === undefined ? { parentId: folder.id } : { AND: [{ parentId: folder.id }, after] },
+        after === undefined
+          ? { AND: [{ parentId: folder.id }, COMMITTED_ONLY] }
+          : { AND: [{ parentId: folder.id }, COMMITTED_ONLY, after] },
       orderBy: [{ type: "asc" }, { name: "asc" }, { id: "asc" }],
       // One more than asked for: the extra row is what proves another page exists, so no
       // COUNT(*) is needed to decide whether to hand back a cursor.
@@ -321,6 +339,10 @@ export class FoldersRepository {
    * Computed on read rather than kept as a counter: at MVP scale this is milliseconds, and a
    * number that is derived cannot drift. The denormalised rollup and its reconciliation job
    * are documented in the change's design.md as the next step, not as today's problem.
+   *
+   * `PENDING` rows are excluded for the same reason they are excluded from a listing, and it
+   * matters more here: a reservation carries the size the *client claimed*, so counting one
+   * would let an abandoned upload inflate the number a deletion dialog states.
    */
   async subtreeAggregate(node: NodeRecord): Promise<SubtreeAggregate> {
     const pattern = subtreePatternOf(node);
@@ -330,7 +352,9 @@ export class FoldersRepository {
              count(*) FILTER (WHERE type = 'FOLDER')::bigint AS folders,
              coalesce(sum(size_bytes), 0)::bigint            AS bytes
       FROM nodes
-      WHERE data_room_id = ${node.dataRoomId}::uuid AND path LIKE ${pattern}
+      WHERE data_room_id = ${node.dataRoomId}::uuid
+        AND path LIKE ${pattern}
+        AND (upload_state IS NULL OR upload_state = 'READY')
     `;
 
     const row = rows[0];
@@ -357,11 +381,23 @@ export class FoldersRepository {
     const pattern = subtreePatternOf(node);
 
     return this.prisma.$transaction(async (tx) => {
-      // TODO(add-file-management): select `storage_key` from the FILE rows in this subtree
-      // before the delete and return it here. The column arrives with that change; until
-      // then no node owns a blob, so there is nothing to release and the seam stays in
-      // place rather than being retrofitted through the service later.
-      const releasedKeys: string[] = [];
+      // Read the keys before the delete, inside the same transaction: afterwards the rows are
+      // gone and nothing anywhere records which objects they owned. A key missed here is a
+      // PDF that stays in the bucket for good — the sweep only ever looks at `PENDING` rows,
+      // and this statement has just deleted those too.
+      const doomed = await tx.node.findMany({
+        where: {
+          dataRoomId: node.dataRoomId,
+          type: "FILE",
+          storageKey: { not: null },
+          OR: [{ id: node.id }, { path: { startsWith: subtreePrefixOf(node) } }],
+        },
+        select: { storageKey: true },
+      });
+
+      const releasedKeys = doomed
+        .map((row) => row.storageKey)
+        .filter((key): key is string => key !== null);
 
       await tx.$executeRaw`
         DELETE FROM nodes

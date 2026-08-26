@@ -16,6 +16,8 @@ const baseEnv = {
   WEB_APP_URL: "http://localhost:3000",
   CORS_ORIGINS: "http://localhost:3000",
   JWT_ACCESS_SECRET: "a-test-secret-of-at-least-thirty-two-chars",
+  SUPABASE_URL: "https://project.supabase.co",
+  SUPABASE_SECRET_KEY: "a-test-service-role-key",
 };
 
 /** Plain HTTP, two ports of one site: Lax is sent, Secure would drop the cookie. */

@@ -34,6 +34,8 @@ const env: NodeJS.ProcessEnv = {
   WEB_APP_URL: "http://localhost:3000",
   CORS_ORIGINS: "http://localhost:3000",
   JWT_ACCESS_SECRET: "0123456789abcdef0123456789abcdef",
+  SUPABASE_URL: "https://project.supabase.co",
+  SUPABASE_SECRET_KEY: "a-test-service-role-key",
 };
 
 async function compileApp(): Promise<TestingModule> {

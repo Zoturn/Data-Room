@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { FilesModule } from "../files/files.module";
 import { FoldersController } from "./folders.controller";
 import { FoldersRepository } from "./folders.repository";
 import { FoldersService } from "./folders.service";
@@ -13,6 +14,10 @@ import { FoldersService } from "./folders.service";
  * `DataRoomModule` imports this one, never the reverse — so there is no cycle to break.
  */
 @Module({
+  // For `BlobReleaseService` alone: a folder deletion frees the objects of every file beneath
+  // it. One direction only — `FilesModule` imports nothing from here (it reuses this module's
+  // pure path helpers by file import, not by injection), so there is no cycle.
+  imports: [FilesModule],
   controllers: [FoldersController],
   providers: [FoldersService, FoldersRepository],
   exports: [FoldersService],

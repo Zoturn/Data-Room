@@ -32,6 +32,8 @@ const env: NodeJS.ProcessEnv = {
   WEB_APP_URL: "http://localhost:3000",
   CORS_ORIGINS: "http://localhost:3000",
   JWT_ACCESS_SECRET: "0123456789abcdef0123456789abcdef",
+  SUPABASE_URL: "https://project.supabase.co",
+  SUPABASE_SECRET_KEY: "a-test-service-role-key",
   ACCESS_TOKEN_TTL_SECONDS: "900",
   REFRESH_TOKEN_TTL_SECONDS: "604800",
   REFRESH_ROTATION_GRACE_SECONDS: "10",
