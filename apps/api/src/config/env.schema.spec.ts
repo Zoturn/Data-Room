@@ -6,6 +6,8 @@ const valid = {
   WEB_APP_URL: "http://localhost:3000",
   CORS_ORIGINS: "http://localhost:3000",
   JWT_ACCESS_SECRET: "a-test-secret-of-at-least-thirty-two-chars",
+  SUPABASE_URL: "https://project.supabase.co",
+  SUPABASE_SECRET_KEY: "a-test-service-role-key",
 };
 
 describe("parseEnv", () => {
@@ -15,19 +17,31 @@ describe("parseEnv", () => {
     expect(env.NODE_ENV).toBe("development");
     expect(env.PORT).toBe(3001);
     expect(env.DATABASE_URL).toBe(valid.DATABASE_URL);
+    expect(env.SUPABASE_STORAGE_BUCKET).toBe("data-room-files");
+    expect(env.UPLOAD_URL_TTL_SECONDS).toBe(300);
+    expect(env.DOWNLOAD_URL_TTL_SECONDS).toBe(300);
+    // Far longer than a signed URL's life: it bounds an abandoned upload, not a slow one.
+    expect(env.UPLOAD_RESERVATION_TTL_SECONDS).toBe(3600);
   });
 
-  it.each(["DATABASE_URL", "DIRECT_URL", "WEB_APP_URL", "CORS_ORIGINS", "JWT_ACCESS_SECRET"])(
-    "refuses to start without %s, and names it",
-    (missing) => {
-      const incomplete = { ...valid };
-      delete incomplete[missing as keyof typeof incomplete];
+  it.each([
+    "DATABASE_URL",
+    "DIRECT_URL",
+    "WEB_APP_URL",
+    "CORS_ORIGINS",
+    "JWT_ACCESS_SECRET",
+    "SUPABASE_URL",
+    // No default, deliberately: a storage credential that falls back to something is a
+    // storage credential nobody notices is missing.
+    "SUPABASE_SECRET_KEY",
+  ])("refuses to start without %s, and names it", (missing) => {
+    const incomplete = { ...valid };
+    delete incomplete[missing as keyof typeof incomplete];
 
-      // Failing at boot is the point: a deploy missing a variable must not look healthy
-      // until the first request touches it.
-      expect(() => parseEnv(incomplete)).toThrow(new RegExp(missing));
-    },
-  );
+    // Failing at boot is the point: a deploy missing a variable must not look healthy
+    // until the first request touches it.
+    expect(() => parseEnv(incomplete)).toThrow(new RegExp(missing));
+  });
 
   it("refuses a malformed URL rather than failing later at connection time", () => {
     expect(() => parseEnv({ ...valid, DATABASE_URL: "not-a-url" })).toThrow(/DATABASE_URL/);

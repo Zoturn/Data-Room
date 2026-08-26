@@ -96,6 +96,40 @@ export const envSchema = z.object({
     .default("false")
     .transform((value) => value === "true"),
   COOKIE_SAMESITE: z.enum(["lax", "strict", "none"]).default("lax"),
+
+  /** The Supabase project the storage bucket lives in, e.g. https://abcdef.supabase.co. */
+  SUPABASE_URL: z.string().url().transform(stripTrailingSlash),
+
+  /**
+   * The service-role key. It bypasses row-level security and can mint a signed URL for any
+   * object in the project, so it is the one value in this file that must never reach a
+   * browser — it is read here and nowhere else, and there is deliberately no NEXT_PUBLIC_
+   * twin of it (env-and-secrets.md rule 4).
+   */
+  SUPABASE_SECRET_KEY: z.string().min(1),
+
+  /** Private bucket holding every uploaded PDF. Objects are only ever reached by signed URL. */
+  SUPABASE_STORAGE_BUCKET: z.string().min(1).default("data-room-files"),
+
+  /**
+   * How long a signed upload URL lives. Long enough for a 50 MB file on a slow link, short
+   * enough that a URL leaked from a log or a shared screen is worthless within minutes. The
+   * client takes a fresh reservation automatically when one expires mid-transfer.
+   */
+  UPLOAD_URL_TTL_SECONDS: z.coerce.number().int().positive().default(300),
+
+  /**
+   * The same trade for downloads. The viewer re-requests one rather than holding it, which
+   * is why this can be minutes rather than hours.
+   */
+  DOWNLOAD_URL_TTL_SECONDS: z.coerce.number().int().positive().default(300),
+
+  /**
+   * How long a `PENDING` node holds its name before the sweep reclaims it. Much longer than
+   * the upload URL's life on purpose: it bounds an *abandoned* upload, and expiring it while
+   * a legitimate retry is still using the name would hand that name to someone else.
+   */
+  UPLOAD_RESERVATION_TTL_SECONDS: z.coerce.number().int().positive().default(3600),
 });
 
 /**

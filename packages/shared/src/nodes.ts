@@ -30,7 +30,7 @@ export function normalizeNodeName(value: string): string {
  * carrying `%` or `_` would match past its own subtree. Validating the shape at the edge
  * keeps that alphabet closed instead of trusting every call site to escape.
  */
-const nodeIdSchema = z.string().uuid();
+export const nodeIdSchema = z.string().uuid();
 
 /**
  * Trimmed before length is checked, so `"  Reports  "` is stored — and collides — as
