@@ -14,13 +14,13 @@
 
 ## 3. Backend skeleton
 
-- [ ] 3.1 Scaffold the NestJS app in `apps/api` with `main.ts`, `AppModule` and a global `/api` prefix
-- [ ] 3.2 Add the env config module: zod schema, fail-fast validation at boot, typed accessor service; write `.env.example`
-- [ ] 3.3 Add Prisma with the Supabase connection string, an empty initial schema and a `PrismaService` with graceful shutdown
-- [ ] 3.4 Implement `GET /health` returning service status and database reachability (503 when the database is down)
-- [ ] 3.5 Add the global exception filter and validation pipe producing the shared error envelope, with a `requestId` middleware
-- [ ] 3.6 Configure CORS allowlist, cookie parser and cookie defaults (`httpOnly`, `Secure`, `SameSite=None` in production)
-- [ ] 3.7 Add the pagination helper (`limit` default and hard maximum, cursor encode/decode)
+- [x] 3.1 Scaffold the NestJS app in `apps/api` with `main.ts`, `AppModule` and a global `/api` prefix
+- [x] 3.2 Add the env config module: zod schema, fail-fast validation at boot, typed accessor service; write `.env.example`
+- [x] 3.3 Add Prisma with the Supabase connection string, an empty initial schema and a `PrismaService` with graceful shutdown
+- [x] 3.4 Implement `GET /health` returning service status and database reachability (503 when the database is down)
+- [x] 3.5 Add the global exception filter and validation pipe producing the shared error envelope, with a `requestId` middleware
+- [x] 3.6 Configure CORS allowlist, cookie parser and cookie defaults (`httpOnly`, `Secure`, `SameSite=None` in production)
+- [x] 3.7 Add the pagination helper (`limit` default and hard maximum, cursor encode/decode)
 
 ## 4. Frontend skeleton
 

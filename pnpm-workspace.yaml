@@ -10,3 +10,4 @@ allowBuilds:
   prisma: true
   argon2: true
   esbuild: true
+  cypress: true
