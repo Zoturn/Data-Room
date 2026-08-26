@@ -25,6 +25,7 @@ import type { PickerSelection } from "@/features/data-room/components/FolderPick
 import { MoveFileDialog } from "@/features/data-room/components/MoveFileDialog";
 import { NodeList } from "@/features/data-room/components/NodeList";
 import { NodeRow } from "@/features/data-room/components/NodeRow";
+import { ShareDialog } from "@/features/sharing/components/ShareDialog";
 import { RenameDialog } from "@/features/data-room/components/RenameDialog";
 import { RenameFileDialog } from "@/features/data-room/components/RenameFileDialog";
 import { isMissing } from "@/features/data-room/file-details";
@@ -59,7 +60,8 @@ type ActiveDialog =
   | { kind: "create" }
   | { kind: "rename"; node: NodeSummary; at: TreeLocation | null }
   | { kind: "move"; node: NodeSummary; at: TreeLocation }
-  | { kind: "delete"; node: NodeSummary; at: TreeLocation; leavesOpenFolder: boolean };
+  | { kind: "delete"; node: NodeSummary; at: TreeLocation; leavesOpenFolder: boolean }
+  | { kind: "share"; node: NodeSummary };
 
 export type FolderContentsProps = {
   roomId: string;
@@ -339,6 +341,7 @@ export function FolderContents({ roomId, folderId }: FolderContentsProps) {
                         : fileHref(roomId, node.id)
                     }
                     canRename
+                    canShare
                     // Only files move in this change; a folder move rewrites a whole subtree
                     // and has no endpoint yet, so it is absent rather than disabled.
                     canMove={node.type === "FILE"}
@@ -349,6 +352,9 @@ export function FolderContents({ roomId, folderId }: FolderContentsProps) {
                     onMove={(target) => {
                       if (here === null) return;
                       setDialog({ kind: "move", node: target, at: here });
+                    }}
+                    onShare={(target) => {
+                      setDialog({ kind: "share", node: target });
                     }}
                     onDelete={(target) => {
                       if (here === null) return;
@@ -400,6 +406,16 @@ export function FolderContents({ roomId, folderId }: FolderContentsProps) {
           parentName={opened.folder.name}
           isPending={createFolder.isPending}
           onCreate={handleCreate}
+        />
+      ) : null}
+
+      {dialog.kind === "share" ? (
+        <ShareDialog
+          open
+          onOpenChange={(next) => {
+            if (!next) closeDialog();
+          }}
+          node={dialog.node}
         />
       ) : null}
 

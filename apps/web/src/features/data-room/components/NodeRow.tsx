@@ -1,7 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { FileText, Folder, FolderInput, MoreVertical, Pencil, Trash2 } from "lucide-react";
+import {
+  FileText,
+  Folder,
+  FolderInput,
+  MoreVertical,
+  Pencil,
+  Share2,
+  Trash2,
+} from "lucide-react";
 import type { NodeSummary } from "@data-room/shared";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,9 +32,11 @@ export type NodeRowProps = {
   canRename: boolean;
   canMove: boolean;
   canDelete: boolean;
+  canShare: boolean;
   onRename: (node: NodeSummary) => void;
   onMove: (node: NodeSummary) => void;
   onDelete: (node: NodeSummary) => void;
+  onShare: (node: NodeSummary) => void;
 };
 
 export function NodeRow({
@@ -35,9 +45,11 @@ export function NodeRow({
   canRename,
   canMove,
   canDelete,
+  canShare,
   onRename,
   onMove,
   onDelete,
+  onShare,
 }: NodeRowProps) {
   const isFolder = node.type === "FOLDER";
   const Icon = isFolder ? Folder : FileText;
@@ -84,7 +96,7 @@ export function NodeRow({
         {formatUpdatedAt(node.updatedAt)}
       </span>
 
-      {canRename || canMove || canDelete ? (
+      {canRename || canMove || canDelete || canShare ? (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" aria-label={`Actions for ${node.name}`}>
@@ -92,6 +104,16 @@ export function NodeRow({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            {canShare ? (
+              <DropdownMenuItem
+                onSelect={() => {
+                  onShare(node);
+                }}
+              >
+                <Share2 aria-hidden />
+                Share…
+              </DropdownMenuItem>
+            ) : null}
             {canRename ? (
               <DropdownMenuItem
                 onSelect={() => {
