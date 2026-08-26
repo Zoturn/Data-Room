@@ -5,6 +5,7 @@ const valid = {
   DIRECT_URL: "postgresql://user:pass@localhost:5432/db",
   WEB_APP_URL: "http://localhost:3000",
   CORS_ORIGINS: "http://localhost:3000",
+  JWT_ACCESS_SECRET: "a-test-secret-of-at-least-thirty-two-chars",
 };
 
 describe("parseEnv", () => {
@@ -16,7 +17,7 @@ describe("parseEnv", () => {
     expect(env.DATABASE_URL).toBe(valid.DATABASE_URL);
   });
 
-  it.each(["DATABASE_URL", "DIRECT_URL", "WEB_APP_URL", "CORS_ORIGINS"])(
+  it.each(["DATABASE_URL", "DIRECT_URL", "WEB_APP_URL", "CORS_ORIGINS", "JWT_ACCESS_SECRET"])(
     "refuses to start without %s, and names it",
     (missing) => {
       const incomplete = { ...valid };
@@ -53,6 +54,22 @@ describe("parseEnv", () => {
     expect(parseEnv({ ...valid, WEB_APP_URL: "https://app.test/" }).WEB_APP_URL).toBe(
       "https://app.test",
     );
+  });
+
+  it("refuses a signing key short enough to brute-force", () => {
+    // A forgeable access token is a forgeable identity for every account, so this fails at
+    // boot rather than signing tokens nobody can trust.
+    expect(() => parseEnv({ ...valid, JWT_ACCESS_SECRET: "too-short" })).toThrow(
+      /JWT_ACCESS_SECRET/,
+    );
+  });
+
+  it("defaults the token lifetimes and the rotation grace window", () => {
+    const env = parseEnv(valid);
+
+    expect(env.ACCESS_TOKEN_TTL_SECONDS).toBe(900);
+    expect(env.REFRESH_TOKEN_TTL_SECONDS).toBe(604_800);
+    expect(env.REFRESH_ROTATION_GRACE_SECONDS).toBe(10);
   });
 
   it("coerces PORT from its string form", () => {

@@ -40,6 +40,39 @@ export const envSchema = z.object({
     ),
 
   /**
+   * HMAC key for the access token. At least 32 characters — a short key is brute-forceable,
+   * and a forgeable access token is a forgeable identity for every account.
+   */
+  JWT_ACCESS_SECRET: z.string().min(32),
+
+  /**
+   * Token lifetimes. Short for the access token, because nothing can revoke one before it
+   * expires; long for the refresh token, which is revocable and rotates on every use.
+   *
+   * These live here rather than as constants so the cookie's `maxAge` and the token's `exp`
+   * are derived from one value. Two constants in two files drift, and the symptom is a
+   * cookie the browser has already discarded holding a token the server still considers
+   * valid — or the reverse.
+   */
+  ACCESS_TOKEN_TTL_SECONDS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(15 * 60),
+  REFRESH_TOKEN_TTL_SECONDS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(7 * 24 * 60 * 60),
+
+  /**
+   * How long a just-rotated refresh token keeps working. A client firing several requests at
+   * once refreshes more than once; without this window the second attempt looks exactly like
+   * a stolen-token replay and the session revokes itself.
+   */
+  REFRESH_ROTATION_GRACE_SECONDS: z.coerce.number().int().nonnegative().default(10),
+
+  /**
    * Cookie policy is configuration, not code. Production is cross-site
    * (Vercel calling the API host) and needs SameSite=None, which browsers only
    * accept with Secure, which needs HTTPS. Locally the pair differs only by port —

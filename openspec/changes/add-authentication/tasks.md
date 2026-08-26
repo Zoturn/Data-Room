@@ -6,11 +6,11 @@
 
 ## 2. Token and credential services
 
-- [ ] 2.1 Add the Argon2id password service (hash, verify, tuned cost parameters)
-- [ ] 2.2 Add the token service: sign and verify access tokens, mint and hash refresh tokens with a family id
-- [ ] 2.3 Implement refresh rotation with reuse detection — rotate, revoke the predecessor, revoke the family on replay, with a short grace window for the immediately-previous token
-- [ ] 2.4 Add the cookie helpers: set, clear and scope the access and refresh cookies, with `httpOnly` unconditional and `Secure`/`SameSite` read from config
-- [ ] 2.5 Add `COOKIE_SECURE` and `COOKIE_SAMESITE` to the env schema and `.env.example`, defaulting to the local values (`false`, `lax`) and set to `true`/`none` in production
+- [x] 2.1 Add the Argon2id password service (hash, verify, tuned cost parameters)
+- [x] 2.2 Add the token service: sign and verify access tokens, mint and hash refresh tokens with a family id
+- [x] 2.3 Implement refresh rotation with reuse detection — rotate, revoke the predecessor, revoke the family on replay, with a short grace window for the immediately-previous token
+- [x] 2.4 Add the cookie helpers: set, clear and scope the access and refresh cookies, with `httpOnly` unconditional and `Secure`/`SameSite` read from config
+- [x] 2.5 Add `COOKIE_SECURE` and `COOKIE_SAMESITE` to the env schema and `.env.example`, defaulting to the local values (`false`, `lax`) and set to `true`/`none` in production
 
 ## 3. Auth endpoints
 
@@ -32,7 +32,7 @@
 
 - [ ] 5.1 Register the JWT guard globally and add the `@Public()` decorator with its metadata key
 - [ ] 5.2 Mark health and every auth entry point public; confirm an unmarked endpoint returns 401
-- [ ] 5.3 Add the `@CurrentUser()` parameter decorator for controllers
+- [x] 5.3 Add the `@CurrentUser()` parameter decorator for controllers
 
 ## 6. Frontend session layer
 
@@ -46,8 +46,8 @@
 
 ## 7. Tests
 
-- [ ] 7.1 Jest — password service hashes and verifies, and never returns plaintext
-- [ ] 7.2 Jest — rotation issues a new token, invalidates the old one, and revokes the family on replay
+- [x] 7.1 Jest — password service hashes and verifies, and never returns plaintext
+- [x] 7.2 Jest — rotation issues a new token, invalidates the old one, and revokes the family on replay
 - [ ] 7.3 Jest — email normalisation and the account-linking rule
 - [ ] 7.4 Cypress API — register, login, me, refresh, logout; uniform 401 for unknown email and wrong password; 429 past the rate limit; 401 on an unmarked protected endpoint
 - [ ] 7.5 Cypress component — sign-in form validation, error rendering, pending state
