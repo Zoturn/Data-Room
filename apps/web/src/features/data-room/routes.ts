@@ -14,3 +14,12 @@ export function folderHref(roomId: string, folderId: string): string {
 export function roomHref(roomId: string): string {
   return `/rooms/${encodeURIComponent(roomId)}`;
 }
+
+/**
+ * One file, open on its own page. A file is a location like a folder is — the viewer has to
+ * survive a refresh and be linkable, and the room id keeps the address self-describing for
+ * anyone reading it in a browser bar or a log.
+ */
+export function fileHref(roomId: string, fileId: string): string {
+  return `/rooms/${encodeURIComponent(roomId)}/files/${encodeURIComponent(fileId)}`;
+}

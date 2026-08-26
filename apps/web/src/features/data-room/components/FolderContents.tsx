@@ -15,13 +15,22 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { EmptyState, ErrorState, ListSkeleton } from "@/components/states";
 import { ApiError, NetworkError } from "@/lib/api/errors";
+import { UploadDropZone } from "@/features/files/components/UploadDropZone";
+import { UploadPanel } from "@/features/files/components/UploadPanel";
 import { Breadcrumbs } from "@/features/data-room/components/Breadcrumbs";
 import { CreateFolderDialog } from "@/features/data-room/components/CreateFolderDialog";
+import { DeleteFileDialog } from "@/features/data-room/components/DeleteFileDialog";
 import { DeleteFolderDialog } from "@/features/data-room/components/DeleteFolderDialog";
+import type { PickerSelection } from "@/features/data-room/components/FolderPicker";
+import { MoveFileDialog } from "@/features/data-room/components/MoveFileDialog";
+import { NodeList } from "@/features/data-room/components/NodeList";
 import { NodeRow } from "@/features/data-room/components/NodeRow";
 import { RenameDialog } from "@/features/data-room/components/RenameDialog";
+import { RenameFileDialog } from "@/features/data-room/components/RenameFileDialog";
+import { isMissing } from "@/features/data-room/file-details";
 import { summariseAggregate } from "@/features/data-room/format";
 import { useRenameDataRoom, useRoomSummary } from "@/features/data-room/hooks/useDataRoom";
+import { useDeleteFile, useMoveFile, useRenameFile } from "@/features/data-room/hooks/useFile";
 import {
   childrenOf,
   openedFolder,
@@ -32,11 +41,15 @@ import {
   useRenameNode,
   type TreeLocation,
 } from "@/features/data-room/hooks/useFolderContents";
-import { folderHref, roomHref } from "@/features/data-room/routes";
+import { fileHref, folderHref, roomHref } from "@/features/data-room/routes";
 
 /**
- * Which dialog is open, and what it is about. A union rather than four booleans and four
- * nullable targets: "renaming, but no folder chosen" is then not a state that can exist.
+ * Which dialog is open, and what it is about. A union rather than five booleans and five
+ * nullable targets: "renaming, but no node chosen" is then not a state that can exist.
+ *
+ * A rename and a delete each serve both kinds of node, dispatching on `node.type` at the
+ * point of use — folders and files answer to different endpoints and different dialogs, but
+ * the row that opened them is the same row.
  *
  * `at: null` on a rename means the open folder is the Data Room root, whose name belongs to
  * the room itself — so that rename goes to the room endpoint.
@@ -45,6 +58,7 @@ type ActiveDialog =
   | { kind: "none" }
   | { kind: "create" }
   | { kind: "rename"; node: NodeSummary; at: TreeLocation | null }
+  | { kind: "move"; node: NodeSummary; at: TreeLocation }
   | { kind: "delete"; node: NodeSummary; at: TreeLocation; leavesOpenFolder: boolean };
 
 export type FolderContentsProps = {
@@ -55,7 +69,7 @@ export type FolderContentsProps = {
 /**
  * One folder: where it sits, what is in it, and everything the owner can do to it.
  *
- * This is the component that fetches; the breadcrumb, the rows and the three dialogs are
+ * This is the component that fetches; the breadcrumb, the rows and the dialogs are
  * presentational and take their capabilities as props, so the same pieces serve a shared
  * view later without knowing they are in one.
  */
@@ -76,6 +90,10 @@ export function FolderContents({ roomId, folderId }: FolderContentsProps) {
   const renameNode = useRenameNode();
   const renameRoom = useRenameDataRoom(roomId);
   const deleteNode = useDeleteNode(roomId);
+
+  const renameFile = useRenameFile();
+  const moveFile = useMoveFile(roomId);
+  const deleteFile = useDeleteFile(roomId);
 
   const [dialog, setDialog] = useState<ActiveDialog>({ kind: "none" });
   const loadMoreRef = useRef<HTMLButtonElement | null>(null);
@@ -125,12 +143,36 @@ export function FolderContents({ roomId, folderId }: FolderContentsProps) {
       await renameRoom.mutateAsync(name);
       return;
     }
+
+    if (dialog.node.type === "FILE") {
+      await renameFile.mutateAsync({ file: dialog.node, name, at: dialog.at });
+      return;
+    }
+
     await renameNode.mutateAsync({ node: dialog.node, name, at: dialog.at });
+  }
+
+  async function handleMove(destination: PickerSelection): Promise<void> {
+    if (dialog.kind !== "move") return;
+
+    await moveFile.mutateAsync({
+      file: dialog.node,
+      from: dialog.at,
+      to: { parentId: destination.id, ancestry: destination.ancestry },
+    });
+    toast.success(`Moved to “${destination.name}”.`);
   }
 
   async function handleDelete(): Promise<void> {
     if (dialog.kind !== "delete") return;
     const { node, at, leavesOpenFolder } = dialog;
+
+    if (node.type === "FILE") {
+      await deleteFile.mutateAsync({ file: node, at });
+      closeDialog();
+      toast.success(`Deleted “${node.name}”.`);
+      return;
+    }
 
     await deleteNode.mutateAsync({ node, at });
     closeDialog();
@@ -262,78 +304,92 @@ export function FolderContents({ roomId, folderId }: FolderContentsProps) {
         />
       ) : null}
 
-      {contents.isSuccess && items.length === 0 ? (
-        <EmptyState
-          icon={<FolderPlus className="size-8" aria-hidden />}
-          title={isRoot ? "Your Data Room is empty" : "This folder is empty"}
-          description="Create a folder to organise what goes in here. Nothing is visible to anyone else until you share it."
-          action={
-            <Button
-              onClick={() => {
-                setDialog({ kind: "create" });
-              }}
-            >
-              <FolderPlus aria-hidden />
-              New folder
-            </Button>
-          }
-        />
-      ) : null}
-
-      {!isGone && items.length > 0 ? (
-        <div className="flex flex-col gap-3">
-          <ul className="rounded-lg border border-border">
-            <li
-              className="flex items-center gap-2 border-b border-border px-2 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground"
-              aria-hidden
-            >
-              <span className="flex-1 pl-8">Name</span>
-              <span className="hidden w-24 text-right sm:block">Size</span>
-              <span className="hidden w-40 text-right md:block">Modified</span>
-              <span className="w-9" />
-            </li>
-
-            {items.map((node) => (
-              <NodeRow
-                key={node.id}
-                node={node}
-                href={node.type === "FOLDER" ? folderHref(roomId, node.id) : null}
-                // Files arrive with add-file-management; until then a file row has no
-                // actions rather than disabled ones.
-                canRename={node.type === "FOLDER"}
-                canDelete={node.type === "FOLDER"}
-                onRename={(target) => {
-                  setDialog({ kind: "rename", node: target, at: here });
-                }}
-                onDelete={(target) => {
-                  if (here === null) return;
-                  setDialog({ kind: "delete", node: target, at: here, leavesOpenFolder: false });
-                }}
+      {/* The drop zone covers the listing and the empty state alike: an empty folder is
+        exactly where someone reaches for drag-and-drop, and a target that only appears once
+        a folder has something in it is a target nobody finds. */}
+      {opened === null ? null : (
+        <UploadDropZone roomId={roomId} folderId={folderId} folderName={opened.folder.name}>
+          {items.length === 0 ? (
+            <EmptyState
+              icon={<FolderPlus className="size-8" aria-hidden />}
+              title={isRoot ? "Your Data Room is empty" : "This folder is empty"}
+              description="Drop PDFs here to add them, or create a folder to organise what goes in. Nothing is visible to anyone else until you share it."
+              action={
+                <Button
+                  onClick={() => {
+                    setDialog({ kind: "create" });
+                  }}
+                >
+                  <FolderPlus aria-hidden />
+                  New folder
+                </Button>
+              }
+            />
+          ) : (
+            <div className="flex flex-col gap-3">
+              <NodeList
+                items={items}
+                renderRow={(node) => (
+                  <NodeRow
+                    key={node.id}
+                    node={node}
+                    href={
+                      node.type === "FOLDER"
+                        ? folderHref(roomId, node.id)
+                        : fileHref(roomId, node.id)
+                    }
+                    canRename
+                    // Only files move in this change; a folder move rewrites a whole subtree
+                    // and has no endpoint yet, so it is absent rather than disabled.
+                    canMove={node.type === "FILE"}
+                    canDelete
+                    onRename={(target) => {
+                      setDialog({ kind: "rename", node: target, at: here });
+                    }}
+                    onMove={(target) => {
+                      if (here === null) return;
+                      setDialog({ kind: "move", node: target, at: here });
+                    }}
+                    onDelete={(target) => {
+                      if (here === null) return;
+                      setDialog({
+                        kind: "delete",
+                        node: target,
+                        at: here,
+                        leavesOpenFolder: false,
+                      });
+                    }}
+                  />
+                )}
               />
-            ))}
-          </ul>
 
-          {hasNextPage ? (
-            <div className="flex justify-center">
-              <Button
-                ref={loadMoreRef}
-                variant="outline"
-                onClick={() => {
-                  void fetchNextPage();
-                }}
-                disabled={isFetchingNextPage}
-                aria-busy={isFetchingNextPage}
-              >
-                {isFetchingNextPage ? "Loading…" : "Load more"}
-              </Button>
+              {hasNextPage ? (
+                <div className="flex justify-center">
+                  <Button
+                    ref={loadMoreRef}
+                    variant="outline"
+                    onClick={() => {
+                      void fetchNextPage();
+                    }}
+                    disabled={isFetchingNextPage}
+                    aria-busy={isFetchingNextPage}
+                  >
+                    {isFetchingNextPage ? "Loading…" : "Load more"}
+                  </Button>
+                </div>
+              ) : null}
+
+              <p role="status" aria-live="polite" className="sr-only">
+                {isFetchingNextPage ? "Loading more items" : ""}
+              </p>
             </div>
-          ) : null}
+          )}
+        </UploadDropZone>
+      )}
 
-          <p role="status" aria-live="polite" className="sr-only">
-            {isFetchingNextPage ? "Loading more items" : ""}
-          </p>
-        </div>
-      ) : null}
+      {/* Uploads outlive the folder they started in, so the panel is rendered beside the
+        listing rather than inside the drop zone it came from. */}
+      <UploadPanel />
 
       {opened !== null && dialog.kind === "create" ? (
         <CreateFolderDialog
@@ -347,7 +403,19 @@ export function FolderContents({ roomId, folderId }: FolderContentsProps) {
         />
       ) : null}
 
-      {dialog.kind === "rename" ? (
+      {dialog.kind === "rename" && dialog.node.type === "FILE" ? (
+        <RenameFileDialog
+          open
+          onOpenChange={(next) => {
+            if (!next) closeDialog();
+          }}
+          currentName={dialog.node.name}
+          isPending={renameFile.isPending}
+          onRename={handleRename}
+        />
+      ) : null}
+
+      {dialog.kind === "rename" && dialog.node.type === "FOLDER" ? (
         <RenameDialog
           open
           onOpenChange={(next) => {
@@ -360,7 +428,35 @@ export function FolderContents({ roomId, folderId }: FolderContentsProps) {
         />
       ) : null}
 
-      {dialog.kind === "delete" ? (
+      {dialog.kind === "move" && opened !== null ? (
+        <MoveFileDialog
+          open
+          onOpenChange={(next) => {
+            if (!next) closeDialog();
+          }}
+          file={dialog.node}
+          // The open folder's own chain: the picker starts at the room root with the path
+          // down to here already expanded, which is where the file being moved lives.
+          breadcrumbs={opened.breadcrumbs}
+          currentParentId={dialog.at.parentId}
+          isPending={moveFile.isPending}
+          onMove={handleMove}
+        />
+      ) : null}
+
+      {dialog.kind === "delete" && dialog.node.type === "FILE" ? (
+        <DeleteFileDialog
+          open
+          onOpenChange={(next) => {
+            if (!next) closeDialog();
+          }}
+          file={dialog.node}
+          isDeleting={deleteFile.isPending}
+          onConfirm={handleDelete}
+        />
+      ) : null}
+
+      {dialog.kind === "delete" && dialog.node.type === "FOLDER" ? (
         <DeleteFolderDialog
           open
           onOpenChange={(next) => {
@@ -411,15 +507,6 @@ function buildStatLine(input: {
   }
 
   return parts.length === 0 ? null : parts.join(" · ");
-}
-
-/**
- * A folder that is gone answers 404, and so does one that was never the caller's — the API
- * refuses to distinguish them on purpose. Either way the answer to the person looking at it
- * is the same: this is not here any more, and here is the way back.
- */
-function isMissing(error: Error): boolean {
-  return error instanceof ApiError && error.status === 404;
 }
 
 function describeFailure(error: Error): string {

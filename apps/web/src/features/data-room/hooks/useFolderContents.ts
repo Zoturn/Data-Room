@@ -135,7 +135,7 @@ export function useDeletionPreview(
  * Invalidates exactly what a write moved: the listing it happened in, the totals of every
  * ancestor above it, and the room's own summary. Never the whole cache.
  */
-function useTreeInvalidation(roomId: string): (at: TreeLocation) => void {
+export function useTreeInvalidation(roomId: string): (at: TreeLocation) => void {
   const queryClient = useQueryClient();
 
   return useCallback(

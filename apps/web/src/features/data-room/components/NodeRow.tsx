@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FileText, Folder, MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { FileText, Folder, FolderInput, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import type { NodeSummary } from "@data-room/shared";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,7 +14,7 @@ import { formatBytes, formatExactTime, formatUpdatedAt } from "@/features/data-r
 
 export type NodeRowProps = {
   node: NodeSummary;
-  /** A folder navigates; a file has nowhere to go until file management ships. */
+  /** A folder opens its listing, a file opens its viewer; `null` leaves the row inert. */
   href: string | null;
   /**
    * Capabilities arrive as props so this row serves the owner's view and, later, a shared
@@ -22,12 +22,23 @@ export type NodeRowProps = {
    * viewer that deleting exists here.
    */
   canRename: boolean;
+  canMove: boolean;
   canDelete: boolean;
   onRename: (node: NodeSummary) => void;
+  onMove: (node: NodeSummary) => void;
   onDelete: (node: NodeSummary) => void;
 };
 
-export function NodeRow({ node, href, canRename, canDelete, onRename, onDelete }: NodeRowProps) {
+export function NodeRow({
+  node,
+  href,
+  canRename,
+  canMove,
+  canDelete,
+  onRename,
+  onMove,
+  onDelete,
+}: NodeRowProps) {
   const isFolder = node.type === "FOLDER";
   const Icon = isFolder ? Folder : FileText;
 
@@ -39,7 +50,17 @@ export function NodeRow({ node, href, canRename, canDelete, onRename, onDelete }
   );
 
   return (
-    <li className="flex items-center gap-2 border-b border-border px-2 last:border-b-0 hover:bg-accent/40">
+    <li
+      // The listing measures one of these to size its window; every row is the same height,
+      // so the first is enough.
+      data-node-row
+      // Dropping files onto a folder row uploads into that folder. The drop zone wraps the
+      // whole listing and cannot reach into a row's props, so the destination is published
+      // as markup it can find under the pointer with `closest()`.
+      data-folder-drop-id={isFolder ? node.id : undefined}
+      data-folder-drop-name={isFolder ? node.name : undefined}
+      className="flex items-center gap-2 border-b border-border px-2 last:border-b-0 hover:bg-accent/40"
+    >
       {href === null ? (
         <span className="flex min-w-0 flex-1 items-center gap-3 py-3">{label}</span>
       ) : (
@@ -63,7 +84,7 @@ export function NodeRow({ node, href, canRename, canDelete, onRename, onDelete }
         {formatUpdatedAt(node.updatedAt)}
       </span>
 
-      {canRename || canDelete ? (
+      {canRename || canMove || canDelete ? (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" aria-label={`Actions for ${node.name}`}>
@@ -79,6 +100,16 @@ export function NodeRow({ node, href, canRename, canDelete, onRename, onDelete }
               >
                 <Pencil aria-hidden />
                 Rename
+              </DropdownMenuItem>
+            ) : null}
+            {canMove ? (
+              <DropdownMenuItem
+                onSelect={() => {
+                  onMove(node);
+                }}
+              >
+                <FolderInput aria-hidden />
+                Move to…
               </DropdownMenuItem>
             ) : null}
             {canDelete ? (
