@@ -4,6 +4,8 @@ import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { AuthModule } from "./auth/auth.module";
 import { JwtAuthGuard } from "./auth/jwt-auth.guard";
 import { ConfigModule } from "./config/config.module";
+import { DataRoomModule } from "./data-room/data-room.module";
+import { FoldersModule } from "./folders/folders.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { HealthModule } from "./health/health.module";
 import { OriginGuard } from "./common/origin.guard";
@@ -35,6 +37,8 @@ const BASELINE_REQUESTS_PER_WINDOW = 300;
       errorMessage: "Too many attempts. Please wait a moment and try again.",
     }),
     AuthModule,
+    DataRoomModule,
+    FoldersModule,
     HealthModule,
   ],
   providers: [
