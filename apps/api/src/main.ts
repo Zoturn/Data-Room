@@ -27,9 +27,13 @@ async function bootstrap(): Promise<void> {
   app.enableShutdownHooks();
 
   const port = config.get("PORT");
-  await app.listen(port);
 
-  new Logger("Bootstrap").log(`API listening on http://localhost:${port}/api`);
+  // Bind every interface, not just the loopback. A container platform's proxy reaches the
+  // process from outside the container, and a default bind leaves it unreachable — the
+  // service reports healthy while every request returns 502 "Application failed to respond".
+  await app.listen(port, "0.0.0.0");
+
+  new Logger("Bootstrap").log(`API listening on 0.0.0.0:${port}, routes under /api`);
 }
 
 // A configuration failure must stop the process before it listens, so a broken deploy
