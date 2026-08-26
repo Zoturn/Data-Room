@@ -8,13 +8,15 @@ Built for the GS1 full-stack take-home task.
 
 ## Hosted URLs
 
-|              | URL                                    |
-| ------------ | -------------------------------------- |
-| Frontend     | _(pending — `add-project-foundation`)_ |
-| Backend      | _(pending — `add-project-foundation`)_ |
-| Health check | _(pending)_ `/api/health`              |
+|              | URL                                                           |
+| ------------ | ------------------------------------------------------------- |
+| Frontend     | <https://data-room-web-sigma.vercel.app>                      |
+| Backend      | <https://data-room-production-1752.up.railway.app>            |
+| Health check | <https://data-room-production-1752.up.railway.app/api/health> |
 
-_A short tour of what to try first is added with the final change._
+The frontend is deployed and rendering; sign-in and the Data Room itself arrive with
+`add-authentication` and the changes after it. A short tour of what to try first is added
+with the final change.
 
 ## What it does
 
