@@ -17,7 +17,7 @@ paths:
 3. Adding a variable means adding it to the schema _and_ to `.env.example` with a non-secret placeholder, in the same commit.
 4. `.env` files are never committed. Only `.env.example` is tracked.
 5. Secrets never reach the browser. In `apps/web` only `NEXT_PUBLIC_`-prefixed values are readable client-side, and nothing prefixed that way may be a credential.
-6. The Supabase **service** key is server-side only, in `apps/api`. It grants full bucket access; treat it as a root credential.
+6. The Supabase **secret** key (`sb_secret_…`, formerly called the `service_role` key) is server-side only, in `apps/api`. It grants full bucket access and bypasses every access rule; treat it as a root credential. The **publishable** key is a different thing and is safe to expose — do not reach for it here by mistake.
 7. Never log a secret, a token, a password, or a full signed URL. Log identifiers and outcomes.
 8. Distinguish required from optional explicitly in the schema, and give optional values a default there rather than at each use site.
 9. Rotate anything that reaches a log, a screenshot, an issue, or a chat message. Assume exposure is permanent.
@@ -34,7 +34,7 @@ export const envSchema = z.object({
   JWT_ACCESS_SECRET: z.string().min(32),
   JWT_REFRESH_SECRET: z.string().min(32),
   SUPABASE_URL: z.string().url(),
-  SUPABASE_SERVICE_KEY: z.string().min(1),
+  SUPABASE_SECRET_KEY: z.string().min(1),
   SUPABASE_BUCKET: z.string().min(1),
   WEB_APP_URL: z.string().url(),
   CORS_ORIGINS: z.string().transform((s) => s.split(",")),
@@ -46,7 +46,7 @@ export const envSchema = z.object({
 ```bash
 # .env.example — placeholders only, never real values
 DATABASE_URL=postgresql://user:password@host:5432/postgres
-SUPABASE_SERVICE_KEY=your-service-key
+SUPABASE_SECRET_KEY=sb_secret_your-key-here
 ```
 
 ## Anti-patterns

@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "types": ["cypress", "node"],
+    "noEmit": true,
+    "isolatedModules": false,
+    "paths": { "@/*": ["../src/*"] }
+  },
+  "include": ["**/*.ts", "**/*.tsx"]
+}

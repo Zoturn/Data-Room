@@ -1,0 +1,132 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Cypress binaries are large; cache them rather than downloading per job.
+  CYPRESS_CACHE_FOLDER: ${{ github.workspace }}/.cache/cypress
+
+jobs:
+  static:
+    name: Typecheck, lint and unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # The shared package is consumed as compiled output, so it must exist before
+      # the apps are typechecked.
+      - run: pnpm --filter @data-room/shared build
+
+      - run: pnpm --filter @data-room/api prisma:generate
+
+      - run: pnpm typecheck
+
+      # `lint` also runs check:test-runners, which fails the build if any workspace
+      # picks up a runner outside Jest and Cypress.
+      - run: pnpm lint
+
+      - run: pnpm format:check
+
+      - run: pnpm test
+
+  build-and-e2e:
+    name: Build and end-to-end
+    runs-on: ubuntu-latest
+    needs: static
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dataroom_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dataroom_test
+      # CI runs a plain Postgres, not a pooler, so both point at the same place.
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/dataroom_test
+      WEB_APP_URL: http://localhost:3000
+      CORS_ORIGINS: http://localhost:3000
+      COOKIE_SECURE: "false"
+      COOKIE_SAMESITE: lax
+      NEXT_PUBLIC_API_URL: http://localhost:3001/api
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter @data-room/shared build
+      - run: pnpm --filter @data-room/api prisma:generate
+      - run: pnpm --filter @data-room/api prisma:deploy
+
+      - run: pnpm build
+
+      - name: Start the API
+        run: pnpm --filter @data-room/api start &
+
+      - name: Start the web app
+        run: pnpm --filter @data-room/web start &
+
+      # The Cypress support file polls /api/health, so specs wait for readiness on their
+      # own. This gate only fails the job early with a clear message if the API never
+      # comes up at all.
+      - name: Wait for the API
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:3001/api/health > /dev/null; then
+              echo "API is up"; exit 0
+            fi
+            sleep 2
+          done
+          echo "API never became healthy"; exit 1
+
+      - name: API end-to-end
+        run: pnpm --filter @data-room/api e2e
+
+      - name: Component tests
+        run: pnpm --filter @data-room/web cypress run --component
+
+      - name: Web end-to-end
+        run: pnpm --filter @data-room/web e2e
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: cypress-screenshots
+          path: apps/*/cypress/screenshots
+          if-no-files-found: ignore

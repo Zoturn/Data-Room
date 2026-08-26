@@ -1,0 +1,23 @@
+{
+  "$schema": "https://schema.railpack.com",
+  "provider": "node",
+  "packages": {
+    "node": "22"
+  },
+  "steps": {
+    "install": {
+      "commands": ["corepack enable pnpm", "pnpm install --frozen-lockfile"]
+    },
+    "build": {
+      "inputs": [{ "step": "install" }],
+      "commands": [
+        "pnpm --filter @data-room/shared build",
+        "pnpm --filter @data-room/api prisma:generate",
+        "pnpm --filter @data-room/api build"
+      ]
+    }
+  },
+  "deploy": {
+    "startCommand": "pnpm --filter @data-room/api prisma:deploy && pnpm --filter @data-room/api start"
+  }
+}

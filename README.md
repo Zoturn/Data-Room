@@ -67,9 +67,22 @@ _(pending — `add-sharing`;_ see `openspec/changes/add-sharing/design.md`_)_
 
 ## Setup
 
-_(pending — `add-project-foundation`.)_
+Prerequisites: Node 22 (see `.nvmrc`) and pnpm 11 (`corepack enable pnpm`).
 
-Will cover: prerequisites, `pnpm install`, creating `.env` from `.env.example`, provisioning the Supabase project and bucket, running migrations, starting both apps, and running the test suites.
+```bash
+pnpm install
+cp apps/api/.env.example apps/api/.env      # fill in the Supabase connection strings
+cp apps/web/.env.example apps/web/.env.local
+pnpm --filter @data-room/shared build
+pnpm --filter @data-room/api prisma:generate
+pnpm --filter @data-room/api prisma:deploy
+pnpm dev                                     # web on :3000, api on :3001
+```
+
+The API validates its environment at boot and exits with the name of anything missing, so a
+half-configured start fails immediately rather than at the first request.
+
+For provisioning Supabase, Vercel and the API host, follow **[docs/deployment.md](docs/deployment.md)** — a step-by-step runbook with a verification after each stage.
 
 ## Environment
 

@@ -32,11 +32,11 @@
 
 ## 5. Test harnesses
 
-- [ ] 5.1 Configure Jest in `apps/api` (ts-jest, `@nestjs/testing`, coverage thresholds)
-- [ ] 5.2 Configure Jest in `apps/web` for hooks, utilities and pure logic
-- [ ] 5.3 Configure Cypress in `apps/api` for API e2e via `cy.request`, with a `/health` readiness gate and database reset between specs
-- [ ] 5.4 Configure Cypress in `apps/web` for component testing and UI e2e
-- [ ] 5.5 Write the smoke specs: Jest — env validation rejects a missing variable and the error filter shapes an envelope; Cypress — `/health` responds and the app shell renders
+- [x] 5.1 Configure Jest in `apps/api` (ts-jest, `@nestjs/testing`, coverage thresholds)
+- [x] 5.2 Configure Jest in `apps/web` for hooks, utilities and pure logic
+- [x] 5.3 Configure Cypress in `apps/api` for API e2e via `cy.request`, with a `/health` readiness gate and database reset between specs
+- [x] 5.4 Configure Cypress in `apps/web` for component testing and UI e2e
+- [x] 5.5 Write the smoke specs: Jest — env validation rejects a missing variable and the error filter shapes an envelope; Cypress — `/health` responds and the app shell renders
 
 ## 6. Documentation and automation
 
@@ -51,7 +51,7 @@
 
 ## 7. CI and deployment
 
-- [ ] 7.1 Add the GitHub Actions workflow: install → typecheck → lint → Jest → build → Cypress smoke
+- [x] 7.1 Add the GitHub Actions workflow: install → typecheck → lint → Jest → build → Cypress smoke
 - [ ] 7.2 Create the Supabase project, capture the pooled connection string, run the first Prisma migration
 - [ ] 7.3 Deploy `apps/web` to Vercel with the API base URL configured
 - [ ] 7.4 Deploy `apps/api` to Railway or Render with env vars and the CORS allowlist set to the Vercel origin

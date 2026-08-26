@@ -125,6 +125,18 @@ export default tseslint.config(
     },
   },
 
+  // Cypress custom commands can only be typed by merging into its global Chainable
+  // interface. A `type` cannot be merged and there is no ES-module way to augment a global
+  // namespace, so these two rules genuinely do not apply here. Scoped to support files
+  // only — application code stays under the general rule.
+  {
+    files: ["**/cypress/support/**/*.{ts,tsx}"],
+    rules: {
+      "@typescript-eslint/no-namespace": "off",
+      "@typescript-eslint/consistent-type-definitions": "off",
+    },
+  },
+
   // Tests may be looser about casts, but not about `any`.
   {
     files: ["**/*.spec.ts", "**/*.spec.tsx", "**/*.cy.ts", "**/*.cy.tsx", "**/cypress/**"],

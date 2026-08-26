@@ -8,7 +8,10 @@ export const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(3001),
 
+  /** Pooled connection used by the running service. */
   DATABASE_URL: z.string().url(),
+  /** Direct connection; Prisma migrations need a session, which a pooler cannot give. */
+  DIRECT_URL: z.string().url(),
 
   /** Where the browser app runs. OAuth redirects land back here. */
   WEB_APP_URL: z.string().url(),

@@ -12,6 +12,10 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  // Runtime traffic goes through Supabase's pooler.
+  url       = env("DATABASE_URL")
+  // Migrations cannot run over a transaction-mode pooler — they need a session. This is
+  // the direct connection, used by `prisma migrate` only.
+  directUrl = env("DIRECT_URL")
 }

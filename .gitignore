@@ -16,9 +16,11 @@ out/
 
 # Test output
 coverage/
-cypress/videos/
-cypress/screenshots/
-cypress/downloads/
+# A pattern containing a slash is anchored to this file's directory, so these need the
+# leading ** to match apps/*/cypress/.
+**/cypress/videos/
+**/cypress/screenshots/
+**/cypress/downloads/
 
 # Prisma
 prisma/*.db

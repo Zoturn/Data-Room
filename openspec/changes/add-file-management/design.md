@@ -74,13 +74,13 @@ Deleting metadata is transactional; deleting objects is not, because a storage t
 - **A `PENDING` node holds a name that may never be used.** A user who opens the picker and walks away blocks that name until the sweep. → Short reservation window, sweep on a timer, and `PENDING` rows never appear in listings.
 - **The commit can be skipped.** A client that uploads bytes and never commits leaves an object with no `READY` row. → The sweep deletes reservation and object together; the object key is derived from the node id, so nothing is guessed.
 - **Signed URL expiry versus slow connections.** A large file on a poor link can outlive its upload URL. → Expiry sized to the maximum file size at a pessimistic bandwidth, and the client re-requests an intent on an expiry error rather than failing the file.
-- **Cross-origin PUT to storage needs bucket CORS.** Misconfiguration shows up as an opaque browser error. → Bucket CORS is part of the deployment checklist, and the README names the symptom.
+- **The browser PUTs to a different origin than the API.** On S3 or R2 this would need a bucket CORS policy, and getting it wrong shows up as an opaque browser error. Supabase's hosted Storage exposes no CORS configuration at all and responds permissively by default, so there is nothing to set — but that also means an upload failure that *looks* like CORS is always something else (an expired signed URL, or a content type the bucket's allowed-MIME list rejects). → The deployment runbook says so explicitly, so nobody burns an afternoon looking for a setting that does not exist. Swapping to S3 later would reintroduce the requirement.
 - **Inline PDF rendering varies by browser.** → Render in an object/iframe with the signed URL and fall back to an explicit download when the browser will not display it.
 - **The storage service key is a full-bucket credential.** → Server-side only, never in the frontend bundle, and asserted by a test that greps the built client.
 
 ## Migration Plan
 
-Additive migration adding nullable `storageKey`, `contentType`, `checksum` and `uploadState` to `nodes`, plus a partial index on `uploadState = 'PENDING'` for the sweep. Existing folder rows are unaffected. Provision the Supabase bucket as private, with CORS allowing PUT from the frontend origin, before deploying the API.
+Additive migration adding nullable `storageKey`, `contentType`, `checksum` and `uploadState` to `nodes`, plus a partial index on `uploadState = 'PENDING'` for the sweep. Existing folder rows are unaffected. Provision the Supabase bucket as private before deploying the API, with its own allowed-MIME list (`application/pdf`) and size limit set at the bucket. Those duplicate the API's checks on purpose: the bucket is the last line, so a bug in commit-time validation still cannot store the wrong thing.
 
 Rollback drops the columns and the bucket; only demo files exist at this stage.
 

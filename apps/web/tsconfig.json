@@ -13,5 +13,9 @@
     "paths": { "@/*": ["./src/*"] }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules", "cypress"]
+  // cypress.config.ts is excluded by name, not just the cypress/ directory: it imports
+  // "cypress", which registers Chai's globals across the whole program and makes `expect`
+  // in a Jest spec resolve to Chai's Assertion. Cypress files are typechecked by
+  // cypress/tsconfig.json instead.
+  "exclude": ["node_modules", "cypress", "cypress.config.ts"]
 }

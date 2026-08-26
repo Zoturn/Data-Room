@@ -11,7 +11,7 @@
 - [ ] 2.2 Implement it over Supabase Storage with a private bucket and configured expiries
 - [ ] 2.3 Implement the in-memory fake used by Jest
 - [ ] 2.4 Implement the key layout `dataRoomId/nodeId` and prove it ignores the user-supplied name
-- [ ] 2.5 Add the bucket provisioning and CORS steps to the deployment checklist
+- [ ] 2.5 Add bucket provisioning to the deployment runbook: private bucket, allowed MIME `application/pdf`, size limit at the bucket as well as in the API
 
 ## 3. Upload pipeline
 
