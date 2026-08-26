@@ -38,6 +38,23 @@ describe("parseEnv", () => {
     expect(env.CORS_ORIGINS).toEqual(["http://a.test", "http://b.test"]);
   });
 
+  it("strips trailing slashes from allowed origins", () => {
+    // A browser's Origin header never carries a trailing slash, so a configured
+    // "https://app.test/" would match nothing and the preflight would fail silently.
+    const env = parseEnv({
+      ...valid,
+      CORS_ORIGINS: "https://app.test/, https://other.test//",
+    });
+
+    expect(env.CORS_ORIGINS).toEqual(["https://app.test", "https://other.test"]);
+  });
+
+  it("strips a trailing slash from the web app URL", () => {
+    expect(parseEnv({ ...valid, WEB_APP_URL: "https://app.test/" }).WEB_APP_URL).toBe(
+      "https://app.test",
+    );
+  });
+
   it("coerces PORT from its string form", () => {
     expect(parseEnv({ ...valid, PORT: "8080" }).PORT).toBe(8080);
   });

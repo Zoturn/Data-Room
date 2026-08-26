@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+/** An Origin header never carries a trailing slash, so neither should a configured origin. */
+function stripTrailingSlash(value: string): string {
+  return value.replace(/\/+$/, "");
+}
+
 /**
  * Every environment variable the API reads. Nothing outside this file may touch
  * `process.env` — that is what keeps .env.example complete and boot-time validation honest.
@@ -14,16 +19,23 @@ export const envSchema = z.object({
   DIRECT_URL: z.string().url(),
 
   /** Where the browser app runs. OAuth redirects land back here. */
-  WEB_APP_URL: z.string().url(),
+  WEB_APP_URL: z.string().url().transform(stripTrailingSlash),
 
-  /** Comma-separated origins allowed to send credentialed requests. */
+  /**
+   * Comma-separated origins allowed to send credentialed requests.
+   *
+   * Trailing slashes are stripped because a browser's `Origin` header never has one, so
+   * `https://app.example.com/` silently matches nothing. The failure is opaque — the
+   * preflight returns 204 with no `Access-Control-Allow-Origin`, and the app looks broken
+   * rather than misconfigured — so it is worth normalising rather than documenting.
+   */
   CORS_ORIGINS: z
     .string()
     .min(1)
     .transform((value) =>
       value
         .split(",")
-        .map((origin) => origin.trim())
+        .map((origin) => stripTrailingSlash(origin.trim()))
         .filter(Boolean),
     ),
 
