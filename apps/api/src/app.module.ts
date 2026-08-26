@@ -8,6 +8,8 @@ import { DataRoomModule } from "./data-room/data-room.module";
 import { FilesModule } from "./files/files.module";
 import { FoldersModule } from "./folders/folders.module";
 import { PrismaModule } from "./prisma/prisma.module";
+import { PublicSharesModule } from "./sharing/public-shares.module";
+import { SharesModule } from "./sharing/shares.module";
 import { StorageModule } from "./storage/storage.module";
 import { HealthModule } from "./health/health.module";
 import { OriginGuard } from "./common/origin.guard";
@@ -45,6 +47,8 @@ const BASELINE_REQUESTS_PER_WINDOW = 300;
     StorageModule,
     FilesModule,
     FoldersModule,
+    SharesModule,
+    PublicSharesModule,
     HealthModule,
   ],
   providers: [

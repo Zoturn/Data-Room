@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { ConfigService } from "../config/config.service";
+import { SharesModule } from "../sharing/shares.module";
 import { AuthController } from "./auth.controller";
 import { AuthService } from "./auth.service";
 import { SessionCookies } from "./cookies";
@@ -25,6 +26,10 @@ import { UserRepository } from "./user.repository";
  * nobody could rely on.
  */
 @Module({
+  // For `PendingGrantBinder`, and for nothing else it provides. A share invitation is written
+  // against an address before its recipient has an account, so the moment it can be attached
+  // to a user is the moment somebody proves they hold that address — which happens here.
+  imports: [SharesModule],
   controllers: [AuthController],
   providers: [
     PasswordService,

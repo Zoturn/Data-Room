@@ -1,4 +1,4 @@
-import { Injectable, type OnModuleInit } from "@nestjs/common";
+import { Injectable, Logger, type OnModuleInit } from "@nestjs/common";
 import { randomBytes } from "node:crypto";
 import {
   normalizeEmail,
@@ -13,6 +13,7 @@ import {
   InvalidCredentialsError,
   UnauthenticatedError,
 } from "./auth.errors";
+import { PendingGrantBinder } from "../sharing/shares.service";
 import { PasswordService } from "./password.service";
 import { TokenService, type IssuedSession } from "./token.service";
 import { UserRepository, type UserRecord } from "./user.repository";
@@ -72,10 +73,13 @@ export class AuthService implements OnModuleInit {
    */
   private decoyDigest: Promise<string> | null = null;
 
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly users: UserRepository,
     private readonly passwords: PasswordService,
     private readonly tokens: TokenService,
+    private readonly grants: PendingGrantBinder,
   ) {}
 
   /**
@@ -233,7 +237,33 @@ export class AuthService implements OnModuleInit {
   }
 
   private async startSession(user: UserRecord): Promise<AuthenticatedSession> {
+    await this.bindPendingGrants(user);
+
     return { user: this.toSessionUser(user), session: await this.tokens.issue(user.id) };
+  }
+
+  /**
+   * Attach any share invitations waiting on this address to the account that just proved it
+   * holds it.
+   *
+   * Here rather than in `register`, because every route into a session funnels through
+   * `startSession` — password registration, password sign-in and Google — and an invitation
+   * sent to somebody who already had an account must land on their *next* sign-in, not only
+   * on a registration that will never happen again. Both sides of the comparison went through
+   * `normalizeEmail`, which is what makes `Buyer@Acme.com` and `buyer@acme.com` one person.
+   *
+   * A failure here is swallowed on purpose. Binding is a convenience, not a step in
+   * authenticating anybody: refusing the sign-in would lock a user out of their own account
+   * over somebody else's invitation, and the next sign-in binds whatever this attempt missed.
+   * Logged rather than ignored, because a grant that never binds looks from the recipient's
+   * side like the owner forgot to invite them.
+   */
+  private async bindPendingGrants(user: UserRecord): Promise<void> {
+    try {
+      await this.grants.bindPendingGrants(user.id, user.email);
+    } catch (error) {
+      this.logger.error(`Could not bind pending share grants for ${user.id}`, error);
+    }
   }
 
   private decoy(): Promise<string> {

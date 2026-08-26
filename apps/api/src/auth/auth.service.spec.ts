@@ -7,6 +7,7 @@ import {
   InvalidCredentialsError,
   UnauthenticatedError,
 } from "./auth.errors";
+import { PendingGrantBinder } from "../sharing/shares.service";
 import { PasswordService } from "./password.service";
 import { TokenService, type IssuedSession } from "./token.service";
 import {
@@ -103,6 +104,12 @@ async function buildService(
 ): Promise<AuthService> {
   const moduleRef = await Test.createTestingModule({
     providers: [
+      // Binding a pending invitation to a new account is the sharing module's behaviour and is
+      // tested there; here it must only not prevent an account from being created.
+      {
+        provide: PendingGrantBinder,
+        useValue: { bindPendingGrants: (): Promise<number> => Promise.resolve(0) },
+      },
       AuthService,
       { provide: UserRepository, useValue: users },
       { provide: PasswordService, useValue: passwords },
