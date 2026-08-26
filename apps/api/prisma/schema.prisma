@@ -19,3 +19,58 @@ datasource db {
   // the direct connection, used by `prisma migrate` only.
   directUrl = env("DIRECT_URL")
 }
+
+/// A person. Identified by a normalised email, reachable through either sign-in method:
+/// a password credential, a linked Google account, or both. One human, one row — Google
+/// sign-in links to an existing user rather than creating a second account, or someone who
+/// signs up with a password and later clicks "Continue with Google" loses their Data Room.
+model User {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// Trimmed and lower-cased before storage and before every comparison. Uniqueness is
+  /// enforced here so `Owner@Acme.com` and `owner@acme.com` cannot both exist.
+  email String @unique
+
+  /// Null for an account that only ever signs in with Google. Argon2id.
+  passwordHash String? @map("password_hash")
+
+  /// Null until a Google account is linked.
+  googleId String? @unique @map("google_id")
+
+  displayName String   @map("display_name")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  refreshTokens RefreshToken[]
+
+  @@map("users")
+}
+
+/// One issued refresh token. Stored hashed — a leaked database must not yield usable
+/// sessions — and grouped into a family so that replaying a rotated token can revoke every
+/// descendant of the original login rather than just the one presented.
+model RefreshToken {
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+
+  /// Shared by every token descended from one sign-in. Rotation issues a new token in the
+  /// same family; presenting an already-rotated token revokes the whole family.
+  familyId String @map("family_id") @db.Uuid
+
+  /// SHA-256 of the token. The plaintext exists only in the cookie.
+  tokenHash String @unique @map("token_hash")
+
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+
+  /// Set when this token is rotated, so a replay can be distinguished from a first use.
+  replacedById String?  @unique @map("replaced_by_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Revoking a family and expiring old rows are the two queries that matter.
+  @@index([familyId])
+  @@index([userId, expiresAt])
+  @@map("refresh_tokens")
+}

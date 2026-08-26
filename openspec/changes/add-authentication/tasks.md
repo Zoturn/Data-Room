@@ -1,8 +1,8 @@
 ## 1. Data model
 
-- [ ] 1.1 Add the `User` model: id, normalised unique email, optional `passwordHash`, optional unique `googleId`, display name, timestamps
-- [ ] 1.2 Add the `RefreshToken` model: id, userId, `familyId`, hashed token, `expiresAt`, `revokedAt`, `replacedById`
-- [ ] 1.3 Index `User.email` (unique) and `RefreshToken.familyId`; run the migration
+- [x] 1.1 Add the `User` model: id, normalised unique email, optional `passwordHash`, optional unique `googleId`, display name, timestamps
+- [x] 1.2 Add the `RefreshToken` model: id, userId, `familyId`, hashed token, `expiresAt`, `revokedAt`, `replacedById`
+- [x] 1.3 Index `User.email` (unique) and `RefreshToken.familyId`; run the migration
 
 ## 2. Token and credential services
 
