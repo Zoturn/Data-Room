@@ -9,13 +9,25 @@ export const REFRESH_COOKIE_NAME = "refresh_token";
 export const ACCESS_COOKIE_PATH = "/";
 
 /**
- * The refresh cookie is scoped to the one endpoint that consumes it, so it is absent from
- * every ordinary request: a token that is never sent cannot be captured by a proxy, a log,
- * or a mistake in some unrelated handler. The path carries the global `api` prefix because
- * the browser matches it against the request path it will actually send, and it is the same
- * in every environment so a rotated session behaves identically locally and in production.
+ * The refresh cookie is scoped to the auth routes, so it is absent from every ordinary
+ * request: a token that is never sent cannot be captured by a proxy, a log, or a mistake in
+ * some unrelated handler. It never reaches `/folders`, `/files` or `/shares`, which is the
+ * exposure that actually matters.
+ *
+ * It is deliberately NOT narrowed to `/api/auth/refresh`. Cookie paths are prefix matches, so
+ * that narrower scope means the browser never sends the token to `/api/auth/logout` — and
+ * sign-out then clears the cookie while leaving the family live for its full lifetime. The
+ * session *looks* ended and is not, which is the worst of both: anyone holding a copy of the
+ * cookie keeps a working session the user believes they destroyed.
+ *
+ * The cost is that the token also rides on `/api/auth/me` and `/api/auth/login`. Those are few,
+ * they already carry credentials, and none of them logs a cookie.
+ *
+ * The path carries the global `api` prefix because the browser matches it against the request
+ * path it will actually send, and it is identical in every environment so a rotated session
+ * behaves the same locally and in production.
  */
-export const REFRESH_COOKIE_PATH = "/api/auth/refresh";
+export const REFRESH_COOKIE_PATH = "/api/auth";
 
 /*
  * Token lifetimes are NOT declared here. They come from the env schema, so a cookie's

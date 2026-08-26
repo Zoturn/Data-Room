@@ -14,12 +14,12 @@
 
 ## 3. Auth endpoints
 
-- [ ] 3.1 `POST /auth/register` — validate, reject a taken email, create, sign in
-- [ ] 3.2 `POST /auth/login` — verify credentials, return one uniform 401 on every failure path
-- [ ] 3.3 `POST /auth/refresh` — rotate and reissue cookies
-- [ ] 3.4 `POST /auth/logout` — clear cookies, revoke the family, stay idempotent
-- [ ] 3.5 `GET /auth/me` — return the session user without credential material
-- [ ] 3.6 Apply throttling to register, login and refresh with a 429 `RATE_LIMITED` envelope
+- [x] 3.1 `POST /auth/register` — validate, reject a taken email, create, sign in
+- [x] 3.2 `POST /auth/login` — verify credentials, return one uniform 401 on every failure path
+- [x] 3.3 `POST /auth/refresh` — rotate and reissue cookies
+- [x] 3.4 `POST /auth/logout` — clear cookies, revoke the family, stay idempotent
+- [x] 3.5 `GET /auth/me` — return the session user without credential material
+- [x] 3.6 Apply throttling to register, login and refresh with a 429 `RATE_LIMITED` envelope
 
 ## 4. Google OAuth
 
@@ -30,25 +30,25 @@
 
 ## 5. Guards
 
-- [ ] 5.1 Register the JWT guard globally and add the `@Public()` decorator with its metadata key
-- [ ] 5.2 Mark health and every auth entry point public; confirm an unmarked endpoint returns 401
+- [x] 5.1 Register the JWT guard globally and add the `@Public()` decorator with its metadata key
+- [x] 5.2 Mark health and every auth entry point public; confirm an unmarked endpoint returns 401
 - [x] 5.3 Add the `@CurrentUser()` parameter decorator for controllers
 
 ## 6. Frontend session layer
 
-- [ ] 6.1 Add the session provider and `useSession` hook backed by `GET /auth/me`
-- [ ] 6.2 Add single-flight refresh in the API client: intercept 401 once, refresh, replay, clear the session on a second 401
-- [ ] 6.3 Build the sign-in and sign-up screens from shadcn form primitives with zod schemas from `packages/shared`
+- [x] 6.1 Add the session provider and `useSession` hook backed by `GET /auth/me`
+- [x] 6.2 Add single-flight refresh in the API client: intercept 401 once, refresh, replay, clear the session on a second 401
+- [x] 6.3 Build the sign-in and sign-up screens from shadcn form primitives with zod schemas from `packages/shared`
 - [ ] 6.4 Add the Google sign-in button and handle the callback return, including its error state
 - [ ] 6.5 Add route protection that preserves the requested location and returns there after sign-in; redirect signed-in users away from the auth screens
 - [ ] 6.6 Add sign-out to the app shell and clear cached queries on session end
-- [ ] 6.7 Render field-level and form-level errors from the error envelope, and disable the submit control while a request is in flight
+- [x] 6.7 Render field-level and form-level errors from the error envelope, and disable the submit control while a request is in flight
 
 ## 7. Tests
 
 - [x] 7.1 Jest — password service hashes and verifies, and never returns plaintext
 - [x] 7.2 Jest — rotation issues a new token, invalidates the old one, and revokes the family on replay
-- [ ] 7.3 Jest — email normalisation and the account-linking rule
+- [x] 7.3 Jest — email normalisation and the account-linking rule
 - [ ] 7.4 Cypress API — register, login, me, refresh, logout; uniform 401 for unknown email and wrong password; 429 past the rate limit; 401 on an unmarked protected endpoint
 - [ ] 7.5 Cypress component — sign-in form validation, error rendering, pending state
 - [ ] 7.6 Cypress e2e — sign up → reload → still signed in → sign out → protected route redirects; deep link survives sign-in

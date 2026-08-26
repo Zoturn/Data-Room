@@ -72,6 +72,38 @@ describe("parseEnv", () => {
     expect(env.REFRESH_ROTATION_GRACE_SECONDS).toBe(10);
   });
 
+  describe("production cookie policy", () => {
+    const prod = {
+      ...valid,
+      NODE_ENV: "production",
+      COOKIE_SECURE: "true",
+      COOKIE_SAMESITE: "none",
+    };
+
+    it("accepts the correct production pair", () => {
+      const env = parseEnv(prod);
+
+      expect(env.COOKIE_SECURE).toBe(true);
+      expect(env.COOKIE_SAMESITE).toBe("none");
+    });
+
+    it("refuses to boot in production without Secure cookies", () => {
+      // The defaults are the local ones, so omitting this would otherwise deploy cleanly and
+      // put the session token on the wire in clear text before the HTTPS redirect fires.
+      expect(() => parseEnv({ ...prod, COOKIE_SECURE: "false" })).toThrow(/COOKIE_SECURE/);
+    });
+
+    it("refuses SameSite=Lax in production, where the two are different sites", () => {
+      expect(() => parseEnv({ ...prod, COOKIE_SAMESITE: "lax" })).toThrow(/COOKIE_SAMESITE/);
+    });
+
+    it("leaves development alone, where plain HTTP on localhost is the point", () => {
+      expect(() =>
+        parseEnv({ ...valid, COOKIE_SECURE: "false", COOKIE_SAMESITE: "lax" }),
+      ).not.toThrow();
+    });
+  });
+
   it("coerces PORT from its string form", () => {
     expect(parseEnv({ ...valid, PORT: "8080" }).PORT).toBe(8080);
   });

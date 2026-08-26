@@ -85,6 +85,41 @@ export const envSchema = z.object({
   COOKIE_SAMESITE: z.enum(["lax", "strict", "none"]).default("lax"),
 });
 
+/**
+ * Cross-field checks the per-field schema cannot express.
+ *
+ * This is validation of configuration, not an `if (isProd)` branch — the values still come
+ * from the environment, and this only refuses combinations that cannot be correct.
+ */
+export const validatedEnvSchema = envSchema.superRefine((env, ctx) => {
+  if (env.NODE_ENV !== "production") return;
+
+  if (!env.COOKIE_SECURE) {
+    // The defaults are the local ones, so a production deploy that simply omits this would
+    // otherwise pass boot validation and issue session cookies without Secure. Hosts serve
+    // plain HTTP and redirect to HTTPS; a non-Secure cookie is attached to that first
+    // plaintext request, so the session token crosses the wire before the redirect fires.
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["COOKIE_SECURE"],
+      message:
+        "COOKIE_SECURE must be true in production; a session cookie without Secure can be sent over plain HTTP.",
+    });
+  }
+
+  if (env.COOKIE_SAMESITE === "lax") {
+    // Fails closed rather than open — the cross-site app simply stops working — but it is
+    // still a misconfiguration, and a boot failure naming it beats debugging a login that
+    // silently does not persist.
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["COOKIE_SAMESITE"],
+      message:
+        "COOKIE_SAMESITE must be 'none' in production; the frontend and API are different sites.",
+    });
+  }
+});
+
 export type Env = z.infer<typeof envSchema>;
 
 /**
@@ -93,7 +128,7 @@ export type Env = z.infer<typeof envSchema>;
  * first request touches the missing value.
  */
 export function parseEnv(source: NodeJS.ProcessEnv): Env {
-  const result = envSchema.safeParse(source);
+  const result = validatedEnvSchema.safeParse(source);
 
   if (!result.success) {
     const problems = result.error.issues

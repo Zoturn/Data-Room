@@ -366,6 +366,32 @@ describe("TokenService", () => {
       expect(retry.refreshToken).not.toEqual(second.refreshToken);
     });
 
+    it("caps the grace sibling at the successor's expiry, so a replay gains no lifetime", async () => {
+      // Without this, the grace path rewards a replay: the presenter receives a token with a
+      // full fresh lifetime and its own rotation chain, never linked back to what it
+      // replayed. Both parties then rotate independently, reuse detection never fires again,
+      // and a stolen refresh token becomes a permanent parallel session.
+      const first = await tokens.issue(USER_ID);
+      const second = await tokens.rotate(first.refreshToken);
+
+      jest.setSystemTime(secondsLater(5));
+      const sibling = await tokens.rotate(first.refreshToken);
+
+      const successorRecord = store
+        .family(first.familyId)
+        .find((record) => record.tokenHash === hashRefreshToken(second.refreshToken));
+      const siblingRecord = store
+        .family(first.familyId)
+        .find((record) => record.tokenHash === hashRefreshToken(sibling.refreshToken));
+
+      expect(successorRecord).toBeDefined();
+      expect(siblingRecord).toBeDefined();
+      // The sibling stands in for the successor; it must not outlive it.
+      expect(siblingRecord?.expiresAt.getTime()).toBeLessThanOrEqual(
+        successorRecord?.expiresAt.getTime() ?? 0,
+      );
+    });
+
     it("leaves the successor from the first request usable", async () => {
       const first = await tokens.issue(USER_ID);
       const second = await tokens.rotate(first.refreshToken);

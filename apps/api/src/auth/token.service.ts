@@ -284,8 +284,11 @@ export class TokenService {
     presented: RefreshTokenRecord,
     now: Date,
   ): Promise<IssuedSession> {
-    if (await this.withinRotationGrace(presented, now)) {
-      return this.mint(presented.userId, presented.familyId);
+    const successor = await this.liveSuccessor(presented, now);
+    if (successor !== null) {
+      // The sibling inherits the successor's expiry rather than a fresh full lifetime, so a
+      // replay inside the window cannot outlive the session it is standing in for.
+      return this.mint(presented.userId, presented.familyId, successor.expiresAt);
     }
 
     // Deliberately logs the family and never the token or its hash: this line is the
@@ -295,27 +298,52 @@ export class TokenService {
     throw new InvalidRefreshTokenError();
   }
 
-  private async withinRotationGrace(predecessor: RefreshTokenRecord, now: Date): Promise<boolean> {
+  /**
+   * The token that replaced this one, if the grace window still applies — otherwise null.
+   *
+   * Returns the record rather than a boolean because the caller needs its expiry: a grace
+   * sibling is capped at the successor's lifetime, not given a fresh one.
+   */
+  private async liveSuccessor(
+    predecessor: RefreshTokenRecord,
+    now: Date,
+  ): Promise<RefreshTokenRecord | null> {
     const rotatedAt = predecessor.revokedAt;
-    if (rotatedAt === null) return false;
+    if (rotatedAt === null) return null;
     if (now.getTime() - rotatedAt.getTime() > this.options.rotationGraceSeconds * 1000) {
-      return false;
+      return null;
     }
-    if (predecessor.replacedById === null) return false;
+    if (predecessor.replacedById === null) return null;
 
     const successor = await this.store.findById(predecessor.replacedById);
-    if (successor === null) return false;
+    if (successor === null) return null;
 
     // Grace covers exactly one step back, and only while the token that replaced this one
     // is still usable. If the successor has been revoked the family is dead, and if it has
     // itself been rotated the client has moved on — either way a second presentation of
     // this token is a replay, not a retry.
-    return successor.revokedAt === null && successor.expiresAt.getTime() > now.getTime();
+    const stillUsable =
+      successor.revokedAt === null && successor.expiresAt.getTime() > now.getTime();
+
+    return stillUsable ? successor : null;
   }
 
-  /** Persist a brand-new token in `familyId` — a first sign-in, or a grace-window sibling. */
-  private async mint(userId: string, familyId: string): Promise<IssuedSession> {
-    const minted = this.newRefreshToken(userId, familyId, this.now());
+  /**
+   * Persist a brand-new token in `familyId` — a first sign-in, or a grace-window sibling.
+   *
+   * `expiresAtCeiling` bounds the sibling minted on the grace path. Without it a replay
+   * inside the window is *rewarded*: the presenter receives a token with a full fresh
+   * lifetime and its own rotation chain, never linked back to the token it replayed. Both
+   * parties then rotate independently, reuse detection never fires again, and a stolen
+   * credential becomes a permanent parallel session. A grace sibling must be no stronger
+   * than the token it stands in for, so it inherits the successor's expiry.
+   */
+  private async mint(
+    userId: string,
+    familyId: string,
+    expiresAtCeiling?: Date,
+  ): Promise<IssuedSession> {
+    const minted = this.newRefreshToken(userId, familyId, this.now(), expiresAtCeiling);
     const record = await this.store.create(minted.input);
     return this.toSession(record, minted.plaintext);
   }
@@ -324,8 +352,14 @@ export class TokenService {
     userId: string,
     familyId: string,
     now: Date,
+    expiresAtCeiling?: Date,
   ): { plaintext: string; input: NewRefreshToken } {
     const plaintext = randomBytes(REFRESH_TOKEN_BYTES).toString("base64url");
+    const fullLife = new Date(now.getTime() + this.options.refreshTokenTtlSeconds * 1000);
+    const expiresAt =
+      expiresAtCeiling !== undefined && expiresAtCeiling.getTime() < fullLife.getTime()
+        ? expiresAtCeiling
+        : fullLife;
 
     return {
       plaintext,
@@ -333,7 +367,7 @@ export class TokenService {
         userId,
         familyId,
         tokenHash: hashRefreshToken(plaintext),
-        expiresAt: new Date(now.getTime() + this.options.refreshTokenTtlSeconds * 1000),
+        expiresAt,
       },
     };
   }

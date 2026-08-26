@@ -96,12 +96,24 @@ describe("SessionCookies", () => {
     });
 
     it("follows configuration rather than NODE_ENV", () => {
-      // The two must stay independent: a production-mode process behind a local proxy still
-      // needs the local cookie pair, and an isProd branch could not express that.
-      const cookies = sessionCookies({ ...localPolicy, NODE_ENV: "production" });
+      // The policy is read from configuration, never derived from NODE_ENV: a development
+      // process that genuinely serves HTTPS across sites can have the strict pair, and an
+      // `isProd` branch could not express that.
+      const cookies = sessionCookies({ ...productionPolicy, NODE_ENV: "development" });
 
-      expect(cookies.accessCookieOptions().secure).toBe(false);
-      expect(cookies.accessCookieOptions().sameSite).toBe("lax");
+      expect(cookies.accessCookieOptions().secure).toBe(true);
+      expect(cookies.accessCookieOptions().sameSite).toBe("none");
+    });
+
+    it("cannot be configured into the insecure pair in production", () => {
+      // The inverse direction is deliberately NOT permitted. The env schema refuses the
+      // combination at boot: the defaults are the local ones, so a production deploy that
+      // simply omitted them would otherwise issue session cookies without Secure. That is a
+      // cross-field validation of configuration, not an isProd branch in the cookie code —
+      // this file still reads whatever it is given.
+      expect(() => sessionCookies({ ...localPolicy, NODE_ENV: "production" })).toThrow(
+        /COOKIE_SECURE/,
+      );
     });
 
     it("leaves the domain unset so a cookie stays on the host that issued it", () => {
@@ -115,7 +127,24 @@ describe("SessionCookies", () => {
   describe("scope", () => {
     it("scopes the refresh cookie to the refresh endpoint", () => {
       expect(sessionCookies(localPolicy).refreshCookieOptions().path).toBe(REFRESH_COOKIE_PATH);
-      expect(REFRESH_COOKIE_PATH).toBe("/api/auth/refresh");
+      expect(REFRESH_COOKIE_PATH).toBe("/api/auth");
+    });
+
+    it("reaches sign-out, so the family can actually be revoked", () => {
+      // Cookie paths are prefix matches. Scoped to "/api/auth/refresh" the browser never
+      // sends the token to "/api/auth/logout", so sign-out clears the cookie while leaving
+      // the family live for its full lifetime — a session that looks ended and is not.
+      const logout = "/api/auth/logout";
+
+      expect(logout.startsWith(REFRESH_COOKIE_PATH)).toBe(true);
+    });
+
+    it("still never reaches a business endpoint", () => {
+      // The exposure that actually matters: the token must not ride on the routes that will
+      // carry documents and shares.
+      for (const path of ["/api/folders", "/api/files/abc/content-url", "/api/shares"]) {
+        expect(path.startsWith(REFRESH_COOKIE_PATH)).toBe(false);
+      }
     });
 
     it("uses the same refresh path in every environment", () => {

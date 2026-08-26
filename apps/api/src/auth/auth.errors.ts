@@ -37,3 +37,52 @@ export class RefreshTokenAlreadyRotatedError extends Error {
     this.name = "RefreshTokenAlreadyRotatedError";
   }
 }
+
+/**
+ * Sign-in refused. The *only* error the password login path raises, whatever went wrong:
+ * no account with that address, the wrong password, or a password presented against an
+ * account that only has Google. One message for all three, because a distinct "no account
+ * with that email" turns the endpoint into a directory of who is registered — see
+ * apps/api/.claude/rules/auth-and-guards.md rule 4. `AuthService.login` keeps the *timing*
+ * uniform as well; the wording alone is not enough.
+ */
+export class InvalidCredentialsError extends DomainError {
+  readonly code = "INVALID_CREDENTIALS" as const;
+  readonly status = 401;
+
+  constructor() {
+    super("That email address and password do not match an account.");
+  }
+}
+
+/**
+ * The address is already registered.
+ *
+ * This does disclose that an account exists, which the uniform 401 above is careful not to.
+ * The disclosure is unavoidable: a registration form that accepted a taken address would
+ * either create a duplicate or silently do nothing. Sign-in is where enumeration actually
+ * pays off, and sign-in gives nothing away — registration is additionally rate limited so
+ * the address space cannot be walked.
+ */
+export class EmailAlreadyRegisteredError extends DomainError {
+  readonly code = "EMAIL_ALREADY_REGISTERED" as const;
+  readonly status = 409;
+
+  constructor(message = "An account with that email address already exists.") {
+    super(message);
+  }
+}
+
+/**
+ * Google returned a profile whose address it has not verified. Refused, because linking is
+ * done on the email: an unverified address is one the profile's owner typed, so accepting it
+ * would let anyone claim any address and be linked into the account that owns it.
+ */
+export class GoogleEmailNotVerifiedError extends DomainError {
+  readonly code = "INVALID_CREDENTIALS" as const;
+  readonly status = 401;
+
+  constructor() {
+    super("Your Google account's email address is not verified.");
+  }
+}
