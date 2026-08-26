@@ -120,31 +120,29 @@ Railway and Render both work. Railway is quicker; Render's free tier sleeps and 
 2. **Settings → Root Directory**: leave at the repository root. This is a pnpm workspace, so
    the build must run from the top, and `railpack.json` in the repo root already describes
    the whole build.
-3. **Build and start commands**: leave both blank. `railpack.json` in the repo root
-   describes the build:
-
-   - it does **not** override the install step — the Node provider already knows how to
-     copy the workspace manifests and run `pnpm install` for a pnpm workspace
-   - `build` is overridden to build only `packages/shared`, generate the Prisma client and
-     build the API, so the deploy does not also build the Next.js app it will never serve
-   - `deploy.startCommand` runs pending migrations, then starts the API
-
-   > **Do not override the `install` step.** A Railpack step declares the filesystem it
-   > operates on, so replacing `install` also replaces the part that copies `package.json`
-   > into the layer. The result is `[ERR_PNPM_NO_PKG_MANIFEST] No package.json found in
-/app`, which reads like a missing file but is actually a step that was never given one.
-   > Override `commands` on the steps you need to change and leave the rest to the provider.
-
-   Note this deploys **the API only**. The web app goes to Vercel in step 4 — one service
-   cannot start both.
-
-   If Railpack keeps fighting you, delete `railpack.json` and set these two in the Railway
-   dashboard instead. It is less reviewable, but it is a supported path and it works:
+3. **Build and start commands** — set both in **Settings → Build** and
+   **Settings → Deploy**:
 
    ```
    Build:  pnpm install --frozen-lockfile && pnpm --filter @data-room/shared build && pnpm --filter @data-room/api prisma:generate && pnpm --filter @data-room/api build
    Start:  pnpm --filter @data-room/api prisma:deploy && pnpm --filter @data-room/api start
    ```
+
+   Setting them here overrides Railpack's inference, which is what you want: auto-detection
+   sees a workspace with two applications and cannot know that this service builds only the
+   API. Running migrations in the start command keeps the schema and the deployed code in
+   step.
+
+   Note this deploys **the API only**. The web app goes to Vercel in step 4 — one service
+   cannot start both.
+
+   > A committed `railpack.json` is the more reviewable alternative and was tried here first.
+   > It is easy to get wrong in a way that produces a misleading error: a Railpack step
+   > declares the filesystem it operates on, so overriding the `install` step also replaces
+   > the part that copies `package.json` into the layer, and the build fails with
+   > `[ERR_PNPM_NO_PKG_MANIFEST] No package.json found in /app` — which reads as a missing
+   > file rather than a step that was never handed one. If you do reintroduce the file,
+   > override only the `commands` of steps you need to change and leave `install` alone.
 
 4. **Deploy from the `main` branch.** Railway defaults to it. Make sure the code has actually
    been merged there: a branch-per-task-group workflow leaves `main` holding nothing but the
