@@ -11,3 +11,4 @@ allowBuilds:
   argon2: true
   esbuild: true
   cypress: true
+  sharp: true # Next.js image optimisation

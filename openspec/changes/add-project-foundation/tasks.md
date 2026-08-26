@@ -24,11 +24,11 @@
 
 ## 4. Frontend skeleton
 
-- [ ] 4.1 Scaffold the Next.js 15 App Router app in `apps/web` with TypeScript and the App Router directory structure
-- [ ] 4.2 Add Tailwind and initialise shadcn/ui with the base theme tokens; add the first primitives (button, dialog, dropdown, toast)
-- [ ] 4.3 Add the API client: base URL from env, `credentials: "include"`, error-envelope parsing into a typed `ApiError`
-- [ ] 4.4 Add TanStack Query provider, the root layout, and the global error and not-found boundaries
-- [ ] 4.5 Add the app shell — header, content region, toast host — with loading and error states
+- [x] 4.1 Scaffold the Next.js 15 App Router app in `apps/web` with TypeScript and the App Router directory structure
+- [x] 4.2 Add Tailwind and initialise shadcn/ui with the base theme tokens; add the first primitives (button, dialog, dropdown, toast)
+- [x] 4.3 Add the API client: base URL from env, `credentials: "include"`, error-envelope parsing into a typed `ApiError`
+- [x] 4.4 Add TanStack Query provider, the root layout, and the global error and not-found boundaries
+- [x] 4.5 Add the app shell — header, content region, toast host — with loading and error states
 
 ## 5. Test harnesses
 
