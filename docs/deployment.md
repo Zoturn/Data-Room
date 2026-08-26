@@ -128,6 +128,13 @@ Railway and Render both work. Railway is quicker; Render's free tier sleeps and 
    Start:  pnpm --filter @data-room/api prisma:deploy && pnpm --filter @data-room/api start
    ```
 
+   The start command runs migrations before booting, which keeps the schema and the deployed
+   code in step. A baseline migration is committed at `apps/api/prisma/migrations/0_init`
+   precisely so this works from the first deploy: `prisma migrate deploy` **fails** when the
+   migrations directory is empty, and because the commands are chained with `&&`, that
+   failure takes the server down with it — the service reports active and every request
+   returns 502.
+
    Setting them here overrides Railpack's inference, which is what you want: auto-detection
    sees a workspace with two applications and cannot know that this service builds only the
    API. Running migrations in the start command keeps the schema and the deployed code in

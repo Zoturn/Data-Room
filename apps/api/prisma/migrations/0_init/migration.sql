@@ -1,0 +1,6 @@
+-- Baseline migration.
+--
+-- The foundation change ships an empty schema on purpose: the first real models arrive with
+-- add-authentication (User, RefreshToken). This migration exists so `prisma migrate deploy`
+-- has a history to apply and creates the _prisma_migrations table, rather than failing with
+-- "No migration found in prisma/migrations" and taking the API's start command down with it.
