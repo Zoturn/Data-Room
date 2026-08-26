@@ -173,6 +173,11 @@ model Node {
   parent   Node?    @relation("NodeChildren", fields: [parentId], references: [id], onDelete: Cascade)
   children Node[]   @relation("NodeChildren")
 
+  /// Back-relation only. Shares hang off the node so that deleting a node takes its shares
+  /// with it — a revoked-by-deletion share is one the database removed, not one the
+  /// application remembered to clean up.
+  shares Share[]
+
   /// Sibling names are unique after normalisation. Enforced here rather than by a read-then-write
   /// check, which two concurrent requests would both pass.
   @@unique([parentId, normalizedName])
@@ -181,4 +186,92 @@ model Node {
   /// Folder listing and its cursor: folders before files, then by name, then by id to break ties.
   @@index([parentId, type, name, id])
   @@map("nodes")
+}
+
+/// How a share decides who may read it. Fixed at creation: turning a restricted share into a
+/// public one would widen access to a link none of its recipients was ever told about.
+enum ShareMode {
+  PUBLIC_LINK
+  RESTRICTED
+
+  @@map("share_mode")
+}
+
+/// What a share grants. One value, because sharing is read-only — no write path consults a
+/// share, and that absence is the security property. `EDITOR` is deliberately future work:
+/// adding it is a value here plus a capability row, not a migration and an audit of every
+/// place that assumed read.
+enum ShareRole {
+  VIEWER
+
+  @@map("share_role")
+}
+
+/// One grant of read access to a node and everything beneath it. Resolution matches the node
+/// itself or any ancestor id from `Node.path`, so a share made on a folder covers files added
+/// to it afterwards without anything being written here.
+model Share {
+  id     String @id @default(uuid()) @db.Uuid
+  nodeId String @map("node_id") @db.Uuid
+
+  /// The owner who made it. No foreign key: a user's shares are already reached by cascade
+  /// through their Data Room and its nodes, and an owner column that blocks a user delete
+  /// would be a constraint nothing needs.
+  createdBy String @map("created_by") @db.Uuid
+
+  mode ShareMode
+  role ShareRole @default(VIEWER)
+
+  /// SHA-256 of the token, exactly as refresh tokens are stored. The plaintext exists in the
+  /// link the owner copied and nowhere else, so a dumped table — or a support query someone
+  /// runs against it — yields no working link. 256 bits from a CSPRNG, never derived from a
+  /// node id or a file name. Null for RESTRICTED, which has no link to hand out; the unique
+  /// index tolerates that because Postgres treats nulls as distinct.
+  tokenHash String? @unique @map("token_hash")
+
+  /// Null means it does not expire. Compared against `now()` on every resolution rather than
+  /// swept by a job, so an expiry takes effect on the next request with nothing to run.
+  expiresAt DateTime? @map("expires_at")
+
+  /// Set once, never unset. Revocation is immediate for the same reason: resolution filters
+  /// on it, so there is no cache or session to invalidate.
+  revokedAt DateTime? @map("revoked_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  node   Node         @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  grants ShareGrant[]
+
+  /// Resolution's only query: candidate shares for a node id and its ancestors.
+  @@index([nodeId])
+  @@map("shares")
+}
+
+/// One named recipient of a RESTRICTED share. Keyed by email rather than by user, so the
+/// owner can invite someone who has no account yet and the grant binds when they register.
+model ShareGrant {
+  id      String @id @default(uuid()) @db.Uuid
+  shareId String @map("share_id") @db.Uuid
+
+  /// Trimmed and lower-cased before storage and before every comparison, the same rule
+  /// authentication applies to `User.email` — otherwise a grant to `Buyer@Acme.com` would
+  /// never match the account that signed in as `buyer@acme.com`.
+  email String
+
+  /// Filled in the first time the grant is used by a signed-in account. Null while the
+  /// invitation is outstanding, which is also what the dialog shows as "pending".
+  userId String? @map("user_id") @db.Uuid
+
+  acceptedAt DateTime? @map("accepted_at")
+
+  share Share @relation(fields: [shareId], references: [id], onDelete: Cascade)
+
+  /// Adding the same address twice is the same grant. Enforced here, not by a read-then-write
+  /// check, so two concurrent invitations cannot both insert.
+  @@unique([shareId, email])
+  /// Binding pending grants when an address registers or signs in.
+  @@index([email])
+  /// The reverse lookup: everything shared with one account.
+  @@index([userId])
+  @@map("share_grants")
 }

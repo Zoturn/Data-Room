@@ -9,6 +9,8 @@ import {
 import { BlobReleaseService } from "../files/blob-release.service";
 import { FoldersRepository, ROOT_DEPTH, ROOT_PATH, type NodeRecord } from "./folders.repository";
 import { FoldersService, MAX_FOLDER_DEPTH, MaxDepthExceededError } from "./folders.service";
+import { AccessResolver, type Access, type NodeWithOwner } from "../sharing/access.resolver";
+import { NodeAccessService } from "../sharing/node-access.service";
 
 /**
  * Covers, from openspec/changes/add-data-room-tree/specs/folders/spec.md:
@@ -60,6 +62,7 @@ const FIRST_PAGE: PageQuery = { limit: 50 };
 
 type RepositoryStub = {
   findFolderForOwner: jest.Mock<Promise<NodeRecord | null>, [string, string]>;
+  findFolderForRead: jest.Mock<Promise<NodeWithOwner<NodeRecord> | null>, [string]>;
   createFolder: jest.Mock<Promise<NodeSummary>, [NodeRecord, string]>;
   renameNode: jest.Mock<Promise<NodeSummary>, [string, string]>;
   listChildren: jest.Mock<Promise<Page<NodeSummary>>, [NodeRecord, number, string | undefined]>;
@@ -73,6 +76,11 @@ function buildRepository(): RepositoryStub {
     findFolderForOwner: jest
       .fn<Promise<NodeRecord | null>, [string, string]>()
       .mockResolvedValue(financials),
+    // Reads load the node with its owner and let NodeAccessService decide; the owner-scoped
+    // lookup above still serves the write paths, which never consult a share.
+    findFolderForRead: jest
+      .fn<Promise<NodeWithOwner<NodeRecord> | null>, [string]>()
+      .mockResolvedValue({ node: financials, ownerId: OWNER.id }),
     createFolder: jest.fn<Promise<NodeSummary>, [NodeRecord, string]>().mockResolvedValue(CREATED),
     renameNode: jest.fn<Promise<NodeSummary>, [string, string]>().mockResolvedValue(CREATED),
     listChildren: jest
@@ -100,6 +108,14 @@ async function buildService(
 ): Promise<FoldersService> {
   const moduleRef = await Test.createTestingModule({
     providers: [
+      // The real access service over a resolver that answers "owner": these specs are about
+      // what the service does once a caller may read, and substituting the access service
+      // itself would stop exercising the door every read path goes through.
+      NodeAccessService,
+      {
+        provide: AccessResolver,
+        useValue: { resolve: (): Promise<Access> => Promise.resolve({ kind: "owner" }) },
+      },
       FoldersService,
       { provide: FoldersRepository, useValue: repository },
       { provide: BlobReleaseService, useValue: blobs },
@@ -202,7 +218,7 @@ describe("FoldersService", () => {
 
     it("answers 404 when a stranger lists a folder they do not own", async () => {
       const repository = buildRepository();
-      repository.findFolderForOwner.mockResolvedValue(null);
+      repository.findFolderForRead.mockResolvedValue(null);
       const service = await buildService(repository);
 
       await expect(service.listChildren(OWNER, FINANCIALS_ID, FIRST_PAGE)).rejects.toBeInstanceOf(

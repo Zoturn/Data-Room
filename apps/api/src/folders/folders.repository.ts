@@ -12,6 +12,7 @@ import {
 } from "@data-room/shared";
 import { z } from "zod";
 import { NameConflictError, NotFoundError } from "../common/errors/domain-error";
+import type { NodeWithOwner } from "../sharing/access.resolver";
 import { decodeCursor, encodeCursor } from "../common/pagination/cursor";
 import { toPage } from "../common/pagination/paginate";
 import { PrismaService } from "../prisma/prisma.service";
@@ -207,6 +208,35 @@ export class FoldersRepository {
       where: { id, type: "FOLDER", dataRoom: { ownerId } },
       select: NODE_COLUMNS,
     });
+  }
+
+  /**
+   * A folder for a **read**, with the room's owner alongside it and no ownership filter of its
+   * own — because on a read path ownership is no longer the only way in, and the decision now
+   * belongs to the access resolver rather than to a `where` clause.
+   *
+   * The owner id is what the resolver settles ownership with, and it comes back in this same
+   * query rather than in a second one: a shared folder is read by strangers, and one round
+   * trip per view is the budget.
+   *
+   * Returned wrapped rather than as a bare `NodeRecord`. That is deliberate — nothing in this
+   * codebase accepts a `NodeWithOwner`, so the only thing a caller can do with it is hand it
+   * to `NodeAccessService.requireReadable`, which is exactly the property that stops an
+   * unresolved find-by-id from reaching a controller.
+   */
+  async findFolderForRead(id: string): Promise<NodeWithOwner<NodeRecord> | null> {
+    if (!isNodeId(id)) return null;
+
+    const row = await this.prisma.node.findFirst({
+      where: { id, type: "FOLDER" },
+      select: { ...NODE_COLUMNS, dataRoom: { select: { ownerId: true } } },
+    });
+
+    if (row === null) return null;
+
+    const { dataRoom, ...node } = row;
+
+    return { node, ownerId: dataRoom.ownerId };
   }
 
   /**

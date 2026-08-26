@@ -12,6 +12,8 @@ import type {
 import type { AuthUser } from "../auth/jwt-auth.guard";
 import { DomainError, NotFoundError, ValidationFailedError } from "../common/errors/domain-error";
 import { BlobReleaseService } from "../files/blob-release.service";
+import { rerootBreadcrumbs } from "../sharing/access.resolver";
+import { NodeAccessService, type ReadableNode } from "../sharing/node-access.service";
 import { FoldersRepository, toNodeSummary, type NodeRecord } from "./folders.repository";
 
 /**
@@ -55,6 +57,10 @@ export class FoldersService {
     // deleting a folder is the one operation in this module that frees objects, and it must
     // free them the same way a file deletion does (nestjs-architecture.md rule 5).
     private readonly blobs: BlobReleaseService,
+    // The read paths' single door. Injected as a service rather than reached through the
+    // repository so that "this read was authorised" is a call a reviewer can see at the call
+    // site, not a `where` clause they have to go and check.
+    private readonly access: NodeAccessService,
   ) {}
 
   async createFolder(user: AuthUser, input: CreateFolderInput): Promise<NodeSummary> {
@@ -73,23 +79,36 @@ export class FoldersService {
    * — in one response, because an interface that renders a breadcrumb and a list from two
    * round trips shows one of them late.
    */
-  async getContents(user: AuthUser, folderId: string, query: PageQuery): Promise<FolderContents> {
-    const folder = await this.requireFolder(user, folderId);
+  async getContents(
+    user: AuthUser | null,
+    folderId: string,
+    query: PageQuery,
+    token: string | null = null,
+  ): Promise<FolderContents> {
+    const { node: folder, access } = await this.requireReadableFolder(user, folderId, token);
 
     const [breadcrumbs, children] = await Promise.all([
       this.tree.breadcrumbsFor(folder),
       this.tree.listChildren(folder, query.limit, query.cursor),
     ]);
 
-    return { folder: toNodeSummary(folder), breadcrumbs, children };
+    return {
+      folder: toNodeSummary(folder),
+      // Trimmed to the share root for a recipient, untouched for the owner. A crumb list that
+      // started at the room would name folders that were never shared, and in a diligence
+      // process what else exists is itself the confidential part.
+      breadcrumbs: rerootBreadcrumbs(breadcrumbs, access),
+      children,
+    };
   }
 
   async listChildren(
-    user: AuthUser,
+    user: AuthUser | null,
     folderId: string,
     query: PageQuery,
+    token: string | null = null,
   ): Promise<Page<NodeSummary>> {
-    const folder = await this.requireFolder(user, folderId);
+    const { node: folder } = await this.requireReadableFolder(user, folderId, token);
 
     return this.tree.listChildren(folder, query.limit, query.cursor);
   }
@@ -113,11 +132,20 @@ export class FoldersService {
    * spans, run at confirm time, so what the owner reads is what is about to disappear.
    */
   async deletionPreview(user: AuthUser, folderId: string): Promise<DeletionPreview> {
-    return this.subtreeAggregate(user, folderId);
+    // Resolved as the owner rather than through `subtreeAggregate`, which a recipient may
+    // reach. This is the number shown immediately before a destructive action, and it must be
+    // answerable only to the person who can carry that action out.
+    const folder = await this.requireFolder(user, folderId);
+
+    return this.tree.subtreeAggregate(folder);
   }
 
-  async subtreeAggregate(user: AuthUser, folderId: string): Promise<SubtreeAggregate> {
-    const folder = await this.requireFolder(user, folderId);
+  async subtreeAggregate(
+    user: AuthUser | null,
+    folderId: string,
+    token: string | null = null,
+  ): Promise<SubtreeAggregate> {
+    const { node: folder } = await this.requireReadableFolder(user, folderId, token);
 
     return this.tree.subtreeAggregate(folder);
   }
@@ -147,8 +175,33 @@ export class FoldersService {
   }
 
   /**
+   * The one read decision in this module: owner, or someone a share lets in. Both answers come
+   * from the resolver, and everything it refuses is absent rather than forbidden.
+   *
+   * Note what is *not* here. No write method calls this — they all go through `requireFolder`
+   * below, which is still an ownership `where` clause and consults no share at all. Read-only
+   * sharing is enforced by that absence rather than by a role check, so adding a call to this
+   * method from `renameFolder` "for symmetry" would be the exact vulnerability the design
+   * exists to prevent.
+   */
+  private async requireReadableFolder(
+    user: AuthUser | null,
+    folderId: string,
+    token: string | null,
+  ): Promise<ReadableNode<NodeRecord>> {
+    return this.access.requireReadable(
+      await this.tree.findFolderForRead(folderId),
+      { user, token },
+      "That folder is no longer available.",
+    );
+  }
+
+  /**
    * The one ownership decision in this module. Anything the caller does not own is absent
    * rather than forbidden, so there is a single place to be right about it.
+   *
+   * Used by every method that changes something, and by nothing that only reads. A share can
+   * never satisfy it, which is what makes sharing read-only.
    */
   private async requireFolder(user: AuthUser, folderId: string): Promise<NodeRecord> {
     const folder = await this.tree.findFolderForOwner(folderId, user.id);

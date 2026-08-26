@@ -14,6 +14,8 @@ import { NotFoundError } from "../common/errors/domain-error";
 import { ConfigService } from "../config/config.service";
 import { StorageService } from "../storage/storage.service";
 import { subtreePrefixOf, toNodeSummary } from "../folders/folders.repository";
+import { rerootBreadcrumbs } from "../sharing/access.resolver";
+import { NodeAccessService, type ReadableNode } from "../sharing/node-access.service";
 import { BlobReleaseService } from "./blob-release.service";
 import { applyStemRename } from "./file-name";
 import { FilesRepository, type FileRecord } from "./files.repository";
@@ -43,6 +45,10 @@ export class FilesService {
     private readonly storage: StorageService,
     private readonly blobs: BlobReleaseService,
     private readonly config: ConfigService,
+    // The read paths' single door. Injected as a service rather than reached through the
+    // repository so that "this read was authorised" is a call a reviewer can see at the call
+    // site, not a `where` clause they have to go and check.
+    private readonly access: NodeAccessService,
   ) {}
 
   /**
@@ -162,11 +168,17 @@ export class FilesService {
     return committed;
   }
 
-  async getFile(user: AuthUser, fileId: string): Promise<FileDetail> {
-    const file = await this.requireFile(user, fileId);
+  async getFile(
+    user: AuthUser | null,
+    fileId: string,
+    token: string | null = null,
+  ): Promise<FileDetail> {
+    const { node: file, access } = await this.requireReadableFile(user, fileId, token);
     const breadcrumbs = await this.files.breadcrumbsFor(file);
 
-    return { file: toNodeSummary(file), breadcrumbs };
+    // Trimmed to the share root for a recipient, untouched for the owner: the folders above a
+    // shared file were not shared, and naming them in a breadcrumb would disclose them.
+    return { file: toNodeSummary(file), breadcrumbs: rerootBreadcrumbs(breadcrumbs, access) };
   }
 
   /**
@@ -174,8 +186,12 @@ export class FilesService {
    * authorisation: a signed URL needs no cookie, so signing first and checking afterwards has
    * already handed out the file (file-upload-storage.md rule 9).
    */
-  async getContentUrl(user: AuthUser, fileId: string): Promise<ContentUrl> {
-    const file = await this.requireFile(user, fileId);
+  async getContentUrl(
+    user: AuthUser | null,
+    fileId: string,
+    token: string | null = null,
+  ): Promise<ContentUrl> {
+    const { node: file } = await this.requireReadableFile(user, fileId, token);
 
     if (file.storageKey === null) throw new NotFoundError("That file is no longer available.");
     const storageKey = file.storageKey;
@@ -289,6 +305,27 @@ export class FilesService {
     const ttlMs = this.config.get("UPLOAD_RESERVATION_TTL_SECONDS") * 1000;
 
     return Date.now() - createdAt.getTime() > ttlMs;
+  }
+
+  /**
+   * The one read decision for a committed file: owner, or someone a share lets in. Both
+   * answers come from the resolver, and everything it refuses is absent rather than forbidden.
+   *
+   * Nothing that changes a file calls this. Rename, move, delete and the three upload steps go
+   * through `requireFile` below, which is still an ownership `where` clause and consults no
+   * share — that absence is what makes sharing read-only, so wiring this method into a write
+   * path would hand every recipient an edit button.
+   */
+  private async requireReadableFile(
+    user: AuthUser | null,
+    fileId: string,
+    token: string | null,
+  ): Promise<ReadableNode<FileRecord>> {
+    return this.access.requireReadable(
+      await this.files.findFileForRead(fileId),
+      { user, token },
+      "That file is no longer available.",
+    );
   }
 
   /**

@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { SharingModule } from "../sharing/sharing.module";
 import { StorageModule } from "../storage/storage.module";
 import { BlobReleaseQueue } from "./blob-release.queue";
 import { BlobReleaseService } from "./blob-release.service";
@@ -21,7 +22,10 @@ import { UploadSweepService } from "./upload-sweep.service";
  * storage itself (nestjs-architecture.md rule 5).
  */
 @Module({
-  imports: [StorageModule],
+  // `SharingModule` for the read paths only: it provides the decision a file read needs and
+  // nothing that could create or revoke a share. The dependency runs one way — sharing knows
+  // nothing about this module — so there is no cycle.
+  imports: [StorageModule, SharingModule],
   controllers: [FilesController],
   providers: [
     FilesService,

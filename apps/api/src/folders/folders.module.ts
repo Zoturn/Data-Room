@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { FilesModule } from "../files/files.module";
+import { SharingModule } from "../sharing/sharing.module";
 import { FoldersController } from "./folders.controller";
 import { FoldersRepository } from "./folders.repository";
 import { FoldersService } from "./folders.service";
@@ -17,7 +18,9 @@ import { FoldersService } from "./folders.service";
   // For `BlobReleaseService` alone: a folder deletion frees the objects of every file beneath
   // it. One direction only — `FilesModule` imports nothing from here (it reuses this module's
   // pure path helpers by file import, not by injection), so there is no cycle.
-  imports: [FilesModule],
+  // `SharingModule` for the read paths only: it provides the decision a folder read needs and
+  // nothing that could create or revoke a share.
+  imports: [FilesModule, SharingModule],
   controllers: [FoldersController],
   providers: [FoldersService, FoldersRepository],
   exports: [FoldersService],

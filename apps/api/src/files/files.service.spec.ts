@@ -8,6 +8,8 @@ import { BlobReleaseQueue } from "./blob-release.queue";
 import { BlobReleaseService } from "./blob-release.service";
 import { FilesRepository, type FileRecord, type ReservedFile } from "./files.repository";
 import { FilesService } from "./files.service";
+import { AccessResolver, type Access, type NodeWithOwner } from "../sharing/access.resolver";
+import { NodeAccessService } from "../sharing/node-access.service";
 
 /**
  * The security decisions this service makes: what a commit is allowed to accept, and who is
@@ -86,6 +88,7 @@ function pdfBytes(trailing = "\n%%EOF\n"): Uint8Array {
 
 type RepositoryStub = {
   findFileForOwner: jest.Mock<Promise<FileRecord | null>, [string, string]>;
+  findFileForRead: jest.Mock<Promise<NodeWithOwner<FileRecord> | null>, [string]>;
   findReservationForOwner: jest.Mock<Promise<FileRecord | null>, [string, string]>;
   findFolderForOwner: jest.Mock<Promise<FileRecord | null>, [string, string]>;
   findNodeForOwner: jest.Mock<Promise<FileRecord | null>, [string, string]>;
@@ -103,6 +106,11 @@ function buildRepository(): RepositoryStub {
     findFileForOwner: jest
       .fn<Promise<FileRecord | null>, [string, string]>()
       .mockResolvedValue(committedFile),
+    // The read path loads the node with its owner and lets NodeAccessService decide; the
+    // owner-scoped lookup above still serves the write paths.
+    findFileForRead: jest
+      .fn<Promise<NodeWithOwner<FileRecord> | null>, [string]>()
+      .mockResolvedValue({ node: committedFile, ownerId: OWNER.id }),
     findReservationForOwner: jest
       .fn<Promise<FileRecord | null>, [string, string]>()
       .mockResolvedValue(reservation),
@@ -137,6 +145,14 @@ async function buildHarness(repository: RepositoryStub = buildRepository()): Pro
 
   const moduleRef = await Test.createTestingModule({
     providers: [
+      // The real access service over a resolver that answers "owner": these specs are about
+      // what the service does once a caller may read, and substituting the access service
+      // itself would stop exercising the door every read path goes through.
+      NodeAccessService,
+      {
+        provide: AccessResolver,
+        useValue: { resolve: (): Promise<Access> => Promise.resolve({ kind: "owner" }) },
+      },
       FilesService,
       BlobReleaseService,
       BlobReleaseQueue,

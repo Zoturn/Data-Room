@@ -9,6 +9,7 @@ import {
 } from "@data-room/shared";
 import { NameConflictError, NotFoundError } from "../common/errors/domain-error";
 import { PrismaService } from "../prisma/prisma.service";
+import type { NodeWithOwner } from "../sharing/access.resolver";
 import { storageKeyFor } from "../storage/storage.service";
 import {
   ancestorIdsOf,
@@ -130,6 +131,33 @@ export class FilesRepository {
       where: { id, type: "FILE", uploadState: "READY", dataRoom: { ownerId } },
       select: FILE_COLUMNS,
     });
+  }
+
+  /**
+   * A committed file for a **read**, with the room's owner alongside it and no ownership
+   * filter of its own — because on a read path ownership is no longer the only way in, and the
+   * decision now belongs to the access resolver rather than to a `where` clause.
+   *
+   * `uploadState: "READY"` stays exactly where it was. A reservation is still not a file, and
+   * a share on a folder must not make one visible to a recipient that its own owner cannot
+   * see.
+   *
+   * Returned wrapped rather than as a bare `FileRecord`, so the only thing a caller can do
+   * with it is hand it to `NodeAccessService.requireReadable`.
+   */
+  async findFileForRead(id: string): Promise<NodeWithOwner<FileRecord> | null> {
+    if (!isNodeId(id)) return null;
+
+    const row = await this.prisma.node.findFirst({
+      where: { id, type: "FILE", uploadState: "READY" },
+      select: { ...FILE_COLUMNS, dataRoom: { select: { ownerId: true } } },
+    });
+
+    if (row === null) return null;
+
+    const { dataRoom, ...node } = row;
+
+    return { node, ownerId: dataRoom.ownerId };
   }
 
   /**
