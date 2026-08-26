@@ -156,6 +156,10 @@ Railway and Render both work. Railway is quicker; Render's free tier sleeps and 
 
    Leave `PORT` unset — Railway injects it, and the env schema defaults it otherwise.
 
+   The three storage variables are safe to set now and are simply ignored: the env schema
+   drops keys it does not declare, and nothing reads them until `add-file-management` lands.
+   Only `DATABASE_URL` and `DIRECT_URL` are required for the API to boot today.
+
    `COOKIE_SECURE=true` and `COOKIE_SAMESITE=none` are what make the session work across two
    different sites. They require HTTPS on both, which both platforms give you.
 

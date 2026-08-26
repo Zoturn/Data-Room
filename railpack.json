@@ -9,7 +9,6 @@
       "commands": ["corepack enable pnpm", "pnpm install --frozen-lockfile"]
     },
     "build": {
-      "inputs": [{ "step": "install" }],
       "commands": [
         "pnpm --filter @data-room/shared build",
         "pnpm --filter @data-room/api prisma:generate",
