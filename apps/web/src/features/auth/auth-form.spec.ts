@@ -6,7 +6,13 @@ import {
   type FieldError,
 } from "@data-room/shared";
 import { ApiError, NetworkError } from "@/lib/api/errors";
-import { authScreenHref, safeRedirectPath, submitFailureFrom, zodFieldErrors } from "./auth-form";
+import {
+  authScreenHref,
+  destinationFrom,
+  safeRedirectPath,
+  submitFailureFrom,
+  zodFieldErrors,
+} from "./auth-form";
 
 const FIELDS = ["email", "password"] as const;
 
@@ -173,4 +179,23 @@ describe("authScreenHref", () => {
   it("leaves the link clean when there is nothing to preserve", () => {
     expect(authScreenHref("/sign-up", "/")).toBe("/sign-up");
   });
+});
+
+describe("destinationFrom", () => {
+  it("omits the question mark when there is no query", () => {
+    expect(destinationFrom("/rooms/r1", "")).toBe("/rooms/r1");
+  });
+
+  it("preserves a query so a filtered view survives sign-in", () => {
+    expect(safeRedirectPath(destinationFrom("/rooms/r1", "view=list"))).toBe("/rooms/r1?view=list");
+  });
+});
+
+describe("safeRedirectPath loop guard", () => {
+  it.each(["/sign-in", "/sign-up", "/sign-in?next=%2F"])(
+    "refuses %s, which would send the user straight back",
+    (value) => {
+      expect(safeRedirectPath(value)).toBe("/");
+    },
+  );
 });

@@ -140,7 +140,18 @@ export function safeRedirectPath(
   const second = value[1];
   if (second === "/" || second === "\\") return fallback;
 
+  // Never bounce back into the auth screens — signing in only to land on sign-in loops.
+  if (value.startsWith("/sign-in") || value.startsWith("/sign-up")) return fallback;
+
   return value;
+}
+
+/**
+ * The value to put in `?next=` when sending someone away from a protected route, so the
+ * location they asked for survives the round trip through sign-in.
+ */
+export function destinationFrom(pathname: string, query: string): string {
+  return query.length > 0 ? `${pathname}?${query}` : pathname;
 }
 
 /** Carries the preserved destination across the link between the two auth screens. */
