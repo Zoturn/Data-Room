@@ -40,6 +40,52 @@ export const envSchema = z.object({
     ),
 
   /**
+   * HMAC key for the access token. At least 32 characters — a short key is brute-forceable,
+   * and a forgeable access token is a forgeable identity for every account.
+   */
+  JWT_ACCESS_SECRET: z.string().min(32),
+
+  /**
+   * Token lifetimes. Short for the access token, because nothing can revoke one before it
+   * expires; long for the refresh token, which is revocable and rotates on every use.
+   *
+   * These live here rather than as constants so the cookie's `maxAge` and the token's `exp`
+   * are derived from one value. Two constants in two files drift, and the symptom is a
+   * cookie the browser has already discarded holding a token the server still considers
+   * valid — or the reverse.
+   */
+  ACCESS_TOKEN_TTL_SECONDS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(15 * 60),
+  REFRESH_TOKEN_TTL_SECONDS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(7 * 24 * 60 * 60),
+
+  /**
+   * How long a just-rotated refresh token keeps working. A client firing several requests at
+   * once refreshes more than once; without this window the second attempt looks exactly like
+   * a stolen-token replay and the session revokes itself.
+   */
+  REFRESH_ROTATION_GRACE_SECONDS: z.coerce.number().int().nonnegative().default(10),
+
+  /**
+   * The longest a single sign-in may live, however diligently it is rotated.
+   *
+   * REFRESH_TOKEN_TTL_SECONDS is an *idle* timeout — every rotation pushes it forward — so on
+   * its own a session used weekly never ends, and neither does a stolen refresh token being
+   * rotated weekly by someone else. This is the bound that eventually forces a real sign-in.
+   */
+  ABSOLUTE_SESSION_MAX_SECONDS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(30 * 24 * 60 * 60),
+
+  /**
    * Cookie policy is configuration, not code. Production is cross-site
    * (Vercel calling the API host) and needs SameSite=None, which browsers only
    * accept with Secure, which needs HTTPS. Locally the pair differs only by port —
@@ -52,6 +98,41 @@ export const envSchema = z.object({
   COOKIE_SAMESITE: z.enum(["lax", "strict", "none"]).default("lax"),
 });
 
+/**
+ * Cross-field checks the per-field schema cannot express.
+ *
+ * This is validation of configuration, not an `if (isProd)` branch — the values still come
+ * from the environment, and this only refuses combinations that cannot be correct.
+ */
+export const validatedEnvSchema = envSchema.superRefine((env, ctx) => {
+  if (env.NODE_ENV !== "production") return;
+
+  if (!env.COOKIE_SECURE) {
+    // The defaults are the local ones, so a production deploy that simply omits this would
+    // otherwise pass boot validation and issue session cookies without Secure. Hosts serve
+    // plain HTTP and redirect to HTTPS; a non-Secure cookie is attached to that first
+    // plaintext request, so the session token crosses the wire before the redirect fires.
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["COOKIE_SECURE"],
+      message:
+        "COOKIE_SECURE must be true in production; a session cookie without Secure can be sent over plain HTTP.",
+    });
+  }
+
+  if (env.COOKIE_SAMESITE === "lax") {
+    // Fails closed rather than open — the cross-site app simply stops working — but it is
+    // still a misconfiguration, and a boot failure naming it beats debugging a login that
+    // silently does not persist.
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["COOKIE_SAMESITE"],
+      message:
+        "COOKIE_SAMESITE must be 'none' in production; the frontend and API are different sites.",
+    });
+  }
+});
+
 export type Env = z.infer<typeof envSchema>;
 
 /**
@@ -60,7 +141,7 @@ export type Env = z.infer<typeof envSchema>;
  * first request touches the missing value.
  */
 export function parseEnv(source: NodeJS.ProcessEnv): Env {
-  const result = envSchema.safeParse(source);
+  const result = validatedEnvSchema.safeParse(source);
 
   if (!result.success) {
     const problems = result.error.issues

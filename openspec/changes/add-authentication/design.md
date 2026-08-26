@@ -34,6 +34,32 @@ A ~15-minute access token in a cookie readable by every API path, and a ~7-day r
 `httpOnly` is unconditional. `Secure` and `SameSite`, however, cannot be: production is genuinely cross-site (Vercel calling the API host) and needs `SameSite=None`, which browsers accept only alongside `Secure`, which needs HTTPS — none of which exists on a developer's machine. Locally the frontend and API differ only by port, and port is not part of a *site*, so `SameSite=Lax` without `Secure` is both sufficient and correct. Both attributes therefore come from the env schema rather than an `isProd` branch, so the two environments differ in configuration and share one code path. If a browser ever refuses the local cookie anyway, the fallback is to proxy `/api/*` through the Next.js dev server and make the pair same-origin — never to relax the production policy.
 *Alternatives:* running local HTTPS with a self-signed certificate (works, and costs every contributor a trust-store dance); dropping `httpOnly` locally (turns a debugging convenience into a habit that eventually ships).
 
+### Access tokens are signed with `node:crypto`, not a JWT library
+
+The access token is a compact-serialisation JWT signed HS256 directly with `node:crypto`, and
+`@nestjs/jwt` is deliberately not a dependency.
+
+This inverts the usual advice, so the reasoning matters. "Do not hand-roll JWT" exists because
+two specific things go wrong: verifiers that read `alg` out of the header and use it to choose
+an algorithm — which makes `"alg":"none"` and HS256/RS256 confusion trivial — and signature
+comparison that leaks timing. Both are addressed explicitly here: the signature is recomputed
+with HS256 unconditionally and the header's `alg` is never consulted to select anything, the
+comparison is `timingSafeEqual`, and header and claims are validated through zod before use.
+
+`jsonwebtoken`, which `@nestjs/jwt` wraps, is itself vulnerable to algorithm confusion unless
+the caller remembers to pass `algorithms: ['HS256']`. A library does not remove the decision;
+it only moves it somewhere easier to forget.
+
+What we gain is one fewer dependency in the request path and a verifier whose security
+properties are visible in the file. What we give up is a library's accumulated handling of
+claim types we do not issue — `nbf`, audience, issuer, key rotation. If this ever needs
+asymmetric keys, multiple audiences, or JWKS, that trade reverses and the library is the right
+answer.
+
+*Alternative considered and rejected:* rewriting onto `@nestjs/jwt` after the fact. The
+implementation was already covered by tests asserting the confusion and expiry cases; swapping
+verified crypto for a rewrite is churn carrying regression risk, with no security gain.
+
 ### Fail-closed guard, opt-out public routes
 A globally registered JWT guard, with `@Public()` marking the exceptions (health, register, login, refresh, Google routes, and later the public-share endpoints). A new endpoint is protected because nobody did anything, which is the correct default for a document vault.
 *Alternative:* per-controller guards — one omission silently exposes a route, and the sharing change adds many routes at once.
@@ -47,6 +73,26 @@ Unknown email, wrong password, and password login against a Google-only account 
 ### Frontend session as one query plus a single-flight refresh
 `GET /auth/me` is a TanStack Query entry and the only source of session truth. The API client intercepts a 401 once, calls refresh, and replays the original request; concurrent 401s share one in-flight refresh so a page issuing five parallel requests does not rotate the token five times and trigger reuse detection against itself. A second 401 clears the session and redirects.
 *Alternative:* refreshing on a timer — races with a tab that has been asleep, and still needs the 401 path anyway.
+
+### Sessions have an absolute lifetime, not just an idle one
+
+`REFRESH_TOKEN_TTL_SECONDS` is an *idle* timeout: every rotation pushes expiry forward. On its
+own that means a session used regularly never ends — and neither does a stolen refresh token
+being rotated regularly by someone else. Theft becomes permanent, and the victim has no way to
+notice, because a thief who rotates quietly never triggers reuse detection.
+
+So each token records `familyStartedAt`, fixed at sign-in and copied onto every successor, and
+rotation caps a successor's expiry at the earliest of three bounds: the idle timeout, the
+sign-in plus `ABSOLUTE_SESSION_MAX_SECONDS`, and — on the grace path — the expiry of the token
+it stands in for. After thirty days a real sign-in is required whatever happened in between.
+
+The column is denormalised onto every row rather than looked up from the family's oldest member,
+so the cap costs no extra query on the hot rotation path.
+
+*Alternative:* deriving the bound from the oldest row in the family. One more query per
+rotation, for a value that never changes.
+*Cost accepted:* a legitimately active user is signed out every thirty days. That is the point
+of the bound, and it is configuration rather than a constant, so it can be tuned per deployment.
 
 ## Risks / Trade-offs
 

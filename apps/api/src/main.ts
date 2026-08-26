@@ -1,14 +1,22 @@
 import "reflect-metadata";
 import { Logger } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
+import type { NestExpressApplication } from "@nestjs/platform-express";
 import cookieParser from "cookie-parser";
 import { AppModule } from "./app.module";
 import { ApiExceptionFilter } from "./common/errors/api-exception.filter";
 import { ConfigService } from "./config/config.service";
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
   const config = app.get(ConfigService);
+
+  // Behind a platform proxy the socket peer is the proxy, so `req.ip` is identical for every
+  // request on Earth — and the rate limiter, which buckets on it, then throttles the whole
+  // world together: ten login attempts from one laptop would lock everyone out for a minute.
+  // The hop count is pinned rather than `true`: trusting every hop lets a client prepend its
+  // own X-Forwarded-For entry and choose its own bucket.
+  app.set("trust proxy", 1);
 
   app.setGlobalPrefix("api");
   app.useGlobalFilters(new ApiExceptionFilter());

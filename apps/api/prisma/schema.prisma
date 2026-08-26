@@ -19,3 +19,138 @@ datasource db {
   // the direct connection, used by `prisma migrate` only.
   directUrl = env("DIRECT_URL")
 }
+
+/// A person. Identified by a normalised email, reachable through either sign-in method:
+/// a password credential, a linked Google account, or both. One human, one row — Google
+/// sign-in links to an existing user rather than creating a second account, or someone who
+/// signs up with a password and later clicks "Continue with Google" loses their Data Room.
+model User {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// Trimmed and lower-cased before storage and before every comparison. Uniqueness is
+  /// enforced here so `Owner@Acme.com` and `owner@acme.com` cannot both exist.
+  email String @unique
+
+  /// Null for an account that only ever signs in with Google. Argon2id.
+  passwordHash String? @map("password_hash")
+
+  /// Null until a Google account is linked.
+  googleId String? @unique @map("google_id")
+
+  displayName String   @map("display_name")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  refreshTokens RefreshToken[]
+
+  /// Back-relation only. One room per owner is enforced by the unique `ownerId` on DataRoom;
+  /// Prisma requires the other end of the relation to be declared here for the foreign key to exist.
+  dataRoom DataRoom?
+
+  @@map("users")
+}
+
+/// One issued refresh token. Stored hashed — a leaked database must not yield usable
+/// sessions — and grouped into a family so that replaying a rotated token can revoke every
+/// descendant of the original login rather than just the one presented.
+model RefreshToken {
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+
+  /// Shared by every token descended from one sign-in. Rotation issues a new token in the
+  /// same family; presenting an already-rotated token revokes the whole family.
+  familyId String @map("family_id") @db.Uuid
+
+  /// When the sign-in that started this family happened, copied onto every successor.
+  ///
+  /// The refresh TTL is an *idle* timeout: rotation pushes expiry forward, so a session that
+  /// is used weekly never ends — and neither does a stolen token being rotated weekly by
+  /// someone else. This is the absolute bound. Denormalised onto each row so the cap can be
+  /// applied during rotation without a second query for the family's oldest member.
+  familyStartedAt DateTime @map("family_started_at")
+
+  /// SHA-256 of the token. The plaintext exists only in the cookie.
+  tokenHash String @unique @map("token_hash")
+
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+
+  /// Set when this token is rotated, so a replay can be distinguished from a first use.
+  replacedById String?  @unique @map("replaced_by_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Revoking a family and expiring old rows are the two queries that matter.
+  @@index([familyId])
+  @@index([userId, expiresAt])
+  @@map("refresh_tokens")
+}
+
+/// What a node is. Folders and files share one table so that every tree operation —
+/// listing, renaming, moving, sharing, deleting — is written once rather than twice.
+enum NodeType {
+  FOLDER
+  FILE
+
+  @@map("node_type")
+}
+
+/// One owner's repository. The interface shows a single room; the model permits more, which is
+/// why nodes hang off the room rather than off the user. `ownerId` is unique so that two
+/// simultaneous first requests cannot both provision one — the loser reads the winner's row.
+model DataRoom {
+  id      String @id @default(uuid()) @db.Uuid
+  ownerId String @unique @map("owner_id") @db.Uuid
+
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  owner User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  nodes Node[]
+
+  @@map("data_rooms")
+}
+
+/// A folder or a file, discriminated by `type`. The root folder is a real row with a null
+/// `parentId`, so sharing the whole Data Room is the same operation as sharing a folder.
+model Node {
+  id         String  @id @default(uuid()) @db.Uuid
+  dataRoomId String  @map("data_room_id") @db.Uuid
+  parentId   String? @map("parent_id") @db.Uuid
+
+  type NodeType
+  name String
+
+  /// Written by `normalizeNodeName` in @data-room/shared — trimmed, whitespace-collapsed,
+  /// NFC-normalised, lower-cased. Never compared by hand: the unique index below is what
+  /// decides a collision, so two concurrent creates of `report.pdf` cannot both succeed.
+  normalizedName String @map("normalized_name")
+
+  /// The ancestor **id** chain, `/<rootId>/<childId>/`, with `depth` alongside it. Ids and not
+  /// names, so renaming a folder with 50,000 descendants touches exactly one row, and a whole
+  /// subtree is one indexed range scan: `path LIKE '/a/b/%'`.
+  path  String
+  depth Int
+
+  /// Bytes of this node's own content. Always 0 for a folder — a folder's total is the prefix
+  /// aggregate over its subtree, never a counter that can drift.
+  sizeBytes BigInt @default(0) @map("size_bytes")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  dataRoom DataRoom @relation(fields: [dataRoomId], references: [id], onDelete: Cascade)
+  parent   Node?    @relation("NodeChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children Node[]   @relation("NodeChildren")
+
+  /// Sibling names are unique after normalisation. Enforced here rather than by a read-then-write
+  /// check, which two concurrent requests would both pass.
+  @@unique([parentId, normalizedName])
+  /// Subtree prefix scans — aggregate, delete, search-within-folder.
+  @@index([dataRoomId, path])
+  /// Folder listing and its cursor: folders before files, then by name, then by id to break ties.
+  @@index([parentId, type, name, id])
+  @@map("nodes")
+}

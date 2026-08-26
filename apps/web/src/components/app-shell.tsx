@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { FolderLock } from "lucide-react";
+import { SessionMenu } from "@/features/auth/components/SessionMenu";
 
 /**
  * The frame every signed-in page renders inside: a header that names the product, and a
@@ -14,7 +15,10 @@ export function AppShell({ children, actions }: { children: ReactNode; actions?:
             <FolderLock className="size-5" aria-hidden />
             Data Room
           </span>
-          {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
+          <div className="flex items-center gap-2">
+            {actions}
+            <SessionMenu />
+          </div>
         </div>
       </header>
 

@@ -6,5 +6,10 @@
     "isolatedModules": false,
     "paths": { "@/*": ["../src/*"] }
   },
-  "include": ["**/*.ts", "**/*.tsx"]
+  "include": ["**/*.ts", "**/*.tsx"],
+  // The parent excludes `cypress` so that Chai's globals never leak into the app program.
+  // Inherited here that exclusion names this config's entire input, leaving the project
+  // with no files at all. Overridden to empty: these files are excluded there precisely so
+  // they are typechecked here.
+  "exclude": []
 }
