@@ -52,9 +52,9 @@
 ## 7. CI and deployment
 
 - [x] 7.1 Add the GitHub Actions workflow: install → typecheck → lint → Jest → build → Cypress smoke
-- [ ] 7.2 Create the Supabase project, capture BOTH connection strings (pooled `DATABASE_URL` on 6543, session/direct `DIRECT_URL` on 5432), run the first Prisma migration
+- [x] 7.2 Create the Supabase project, capture BOTH connection strings (pooled `DATABASE_URL` on 6543, session/direct `DIRECT_URL` on 5432), run the first Prisma migration
 - [ ] 7.3 Deploy `apps/web` to Vercel with the API base URL configured
-- [ ] 7.4 Deploy `apps/api` to Railway or Render from `main`, with the build and start commands set in the dashboard, env vars, and the CORS allowlist set to the Vercel origin
+- [x] 7.4 Deploy `apps/api` to Railway or Render from `main`, with the build and start commands set in the dashboard, env vars, and the CORS allowlist set to the Vercel origin
 - [ ] 7.5 Verify the deployed pair: `/health` returns ok, and a credentialed cross-origin request from the deployed frontend succeeds
 - [ ] 7.6 Record both hosted URLs in the README
 
