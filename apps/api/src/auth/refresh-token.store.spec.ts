@@ -127,6 +127,8 @@ function createPrismaFake() {
 type PrismaFake = ReturnType<typeof createPrismaFake>;
 
 /** A plaintext token and its stored form, exactly as `TokenService` would produce them. */
+const FAMILY_STARTED_AT = new Date("2026-01-01T00:00:00.000Z");
+
 function mintToken(): { plaintext: string; input: NewRefreshToken } {
   const plaintext = randomBytes(32).toString("base64url");
   return {
@@ -136,6 +138,7 @@ function mintToken(): { plaintext: string; input: NewRefreshToken } {
       familyId: FAMILY_ID,
       tokenHash: hashRefreshToken(plaintext),
       expiresAt: EXPIRY,
+      familyStartedAt: FAMILY_STARTED_AT,
     },
   };
 }
@@ -196,6 +199,7 @@ describe("PrismaRefreshTokenStore", () => {
         data: {
           userId: USER_ID,
           familyId: FAMILY_ID,
+          familyStartedAt: FAMILY_STARTED_AT,
           tokenHash: token.input.tokenHash,
           expiresAt: EXPIRY,
         },
@@ -240,6 +244,7 @@ describe("PrismaRefreshTokenStore", () => {
         "createdAt",
         "expiresAt",
         "familyId",
+        "familyStartedAt",
         "id",
         "replacedById",
         "revokedAt",

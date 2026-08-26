@@ -90,6 +90,7 @@ describe("AuthModule", () => {
       accessTokenTtlSeconds: 900,
       refreshTokenTtlSeconds: 604800,
       rotationGraceSeconds: 10,
+      absoluteSessionMaxSeconds: 2592000,
     });
   });
 

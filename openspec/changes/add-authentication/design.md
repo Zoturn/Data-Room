@@ -74,6 +74,26 @@ Unknown email, wrong password, and password login against a Google-only account 
 `GET /auth/me` is a TanStack Query entry and the only source of session truth. The API client intercepts a 401 once, calls refresh, and replays the original request; concurrent 401s share one in-flight refresh so a page issuing five parallel requests does not rotate the token five times and trigger reuse detection against itself. A second 401 clears the session and redirects.
 *Alternative:* refreshing on a timer — races with a tab that has been asleep, and still needs the 401 path anyway.
 
+### Sessions have an absolute lifetime, not just an idle one
+
+`REFRESH_TOKEN_TTL_SECONDS` is an *idle* timeout: every rotation pushes expiry forward. On its
+own that means a session used regularly never ends — and neither does a stolen refresh token
+being rotated regularly by someone else. Theft becomes permanent, and the victim has no way to
+notice, because a thief who rotates quietly never triggers reuse detection.
+
+So each token records `familyStartedAt`, fixed at sign-in and copied onto every successor, and
+rotation caps a successor's expiry at the earliest of three bounds: the idle timeout, the
+sign-in plus `ABSOLUTE_SESSION_MAX_SECONDS`, and — on the grace path — the expiry of the token
+it stands in for. After thirty days a real sign-in is required whatever happened in between.
+
+The column is denormalised onto every row rather than looked up from the family's oldest member,
+so the cap costs no extra query on the hot rotation path.
+
+*Alternative:* deriving the bound from the oldest row in the family. One more query per
+rotation, for a value that never changes.
+*Cost accepted:* a legitimately active user is signed out every thirty days. That is the point
+of the bound, and it is configuration rather than a constant, so it can be tuned per deployment.
+
 ## Risks / Trade-offs
 
 - **`SameSite=None` requires HTTPS everywhere and is disliked by tracker-blocking browsers.** A reviewer in Safari or a locked-down profile may find sessions dropped, and a developer who copies the production cookie flags locally will find login silently failing. → Both origins on HTTPS in production, cookies partitioned where supported, cookie attributes driven by configuration, `localhost` used consistently on both sides in development, and a Cypress e2e covering sign-in → reload → still signed in, run against both the local and the deployed pair.

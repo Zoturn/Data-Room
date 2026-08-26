@@ -47,6 +47,7 @@ class InMemoryRefreshTokenStore extends RefreshTokenStore {
       familyId: token.familyId,
       tokenHash: token.tokenHash,
       expiresAt: token.expiresAt,
+      familyStartedAt: token.familyStartedAt,
       revokedAt: null,
       replacedById: null,
       createdAt: new Date(),
@@ -95,6 +96,10 @@ const OPTIONS: AuthTokenOptions = {
   accessTokenTtlSeconds: 900,
   refreshTokenTtlSeconds: 60 * 60 * 24 * 30,
   rotationGraceSeconds: 5,
+  // Deliberately longer than the refresh TTL, so the absolute cap does not silently mask the
+  // idle-timeout behaviour the rest of this suite asserts. One test overrides it to prove
+  // the cap actually bites.
+  absoluteSessionMaxSeconds: 60 * 60 * 24 * 90,
 };
 
 const START = new Date("2026-08-26T12:00:00.000Z");
@@ -364,6 +369,54 @@ describe("TokenService", () => {
       const live = store.family(first.familyId).filter((record) => record.revokedAt === null);
       expect(live).toHaveLength(2);
       expect(retry.refreshToken).not.toEqual(second.refreshToken);
+    });
+
+    it("stops extending a session once the absolute maximum is reached", async () => {
+      // The refresh TTL is an IDLE timeout — every rotation pushes it forward. Without an
+      // absolute bound a session used regularly never ends, and neither does a stolen token
+      // being rotated regularly by someone else. This is the bound that forces a real
+      // sign-in eventually.
+      const capped = new TokenService(
+        { ...OPTIONS, refreshTokenTtlSeconds: 3600, absoluteSessionMaxSeconds: 5400 },
+        store,
+      );
+
+      const first = await capped.issue(USER_ID);
+      const startedAt = store
+        .family(first.familyId)
+        .map((record) => record.familyStartedAt.getTime())
+        .sort()[0];
+
+      // Rotate well into the session; the idle timeout alone would grant a further hour.
+      jest.setSystemTime(secondsLater(3000));
+      const rotated = await capped.rotate(first.refreshToken);
+
+      const record = store
+        .family(first.familyId)
+        .find((r) => r.tokenHash === hashRefreshToken(rotated.refreshToken));
+
+      // Capped at the sign-in plus the maximum, NOT at now plus the idle TTL.
+      expect(record?.expiresAt.getTime()).toBe((startedAt ?? 0) + 5400 * 1000);
+      expect(record?.expiresAt.getTime()).toBeLessThan(Date.now() + 3600 * 1000);
+    });
+
+    it("keeps the family clock fixed across rotations rather than resetting it", async () => {
+      // If each successor restarted the clock, the cap would slide forward with the session
+      // and bound nothing at all.
+      const first = await tokens.issue(USER_ID);
+      const startedAt = store.family(first.familyId)[0]?.familyStartedAt.getTime();
+
+      jest.setSystemTime(secondsLater(60));
+      const second = await tokens.rotate(first.refreshToken);
+      jest.setSystemTime(secondsLater(120));
+      await tokens.rotate(second.refreshToken);
+
+      const clocks = new Set(
+        store.family(first.familyId).map((record) => record.familyStartedAt.getTime()),
+      );
+
+      expect(clocks.size).toBe(1);
+      expect([...clocks][0]).toBe(startedAt);
     });
 
     it("caps the grace sibling at the successor's expiry, so a replay gains no lifetime", async () => {

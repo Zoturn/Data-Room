@@ -57,6 +57,14 @@ model RefreshToken {
   /// same family; presenting an already-rotated token revokes the whole family.
   familyId String @map("family_id") @db.Uuid
 
+  /// When the sign-in that started this family happened, copied onto every successor.
+  ///
+  /// The refresh TTL is an *idle* timeout: rotation pushes expiry forward, so a session that
+  /// is used weekly never ends — and neither does a stolen token being rotated weekly by
+  /// someone else. This is the absolute bound. Denormalised onto each row so the cap can be
+  /// applied during rotation without a second query for the family's oldest member.
+  familyStartedAt DateTime @map("family_started_at")
+
   /// SHA-256 of the token. The plaintext exists only in the cookie.
   tokenHash String @unique @map("token_hash")
 

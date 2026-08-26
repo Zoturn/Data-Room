@@ -24,6 +24,12 @@ export type AuthTokenOptions = {
    * difference between tolerating a client's own parallel retry and revoking its session.
    */
   rotationGraceSeconds: number;
+  /**
+   * The longest a single sign-in may live, however diligently it is rotated. The refresh TTL
+   * is an idle timeout and slides forward on every use, so without this bound a session — or
+   * a stolen token being refreshed by someone else — never ends.
+   */
+  absoluteSessionMaxSeconds: number;
 };
 
 export const AUTH_TOKEN_OPTIONS = Symbol("AUTH_TOKEN_OPTIONS");
@@ -38,6 +44,8 @@ export type RefreshTokenRecord = {
   revokedAt: Date | null;
   replacedById: string | null;
   createdAt: Date;
+  /** When the sign-in that began this family happened. Fixed for the family's whole life. */
+  familyStartedAt: Date;
 };
 
 export type NewRefreshToken = {
@@ -45,6 +53,7 @@ export type NewRefreshToken = {
   familyId: string;
   tokenHash: string;
   expiresAt: Date;
+  familyStartedAt: Date;
 };
 
 /**
@@ -178,7 +187,8 @@ export class TokenService {
 
   /** Start a new session: a fresh family, its first refresh token, and an access token. */
   async issue(userId: string): Promise<IssuedSession> {
-    return this.mint(userId, randomUUID());
+    // A new sign-in starts the family clock; every successor inherits this instant.
+    return this.mint(userId, randomUUID(), this.now());
   }
 
   /**
@@ -211,7 +221,12 @@ export class TokenService {
     // Revoked but never rotated: the family was killed by a logout or by an earlier reuse.
     if (presented.revokedAt !== null) throw new InvalidRefreshTokenError();
 
-    const successor = this.newRefreshToken(presented.userId, presented.familyId, now);
+    const successor = this.newRefreshToken(
+      presented.userId,
+      presented.familyId,
+      now,
+      presented.familyStartedAt,
+    );
     try {
       const record = await this.store.rotate(presented.id, successor.input, now);
       return this.toSession(record, successor.plaintext);
@@ -288,7 +303,12 @@ export class TokenService {
     if (successor !== null) {
       // The sibling inherits the successor's expiry rather than a fresh full lifetime, so a
       // replay inside the window cannot outlive the session it is standing in for.
-      return this.mint(presented.userId, presented.familyId, successor.expiresAt);
+      return this.mint(
+        presented.userId,
+        presented.familyId,
+        presented.familyStartedAt,
+        successor.expiresAt,
+      );
     }
 
     // Deliberately logs the family and never the token or its hash: this line is the
@@ -341,9 +361,16 @@ export class TokenService {
   private async mint(
     userId: string,
     familyId: string,
+    familyStartedAt: Date,
     expiresAtCeiling?: Date,
   ): Promise<IssuedSession> {
-    const minted = this.newRefreshToken(userId, familyId, this.now(), expiresAtCeiling);
+    const minted = this.newRefreshToken(
+      userId,
+      familyId,
+      this.now(),
+      familyStartedAt,
+      expiresAtCeiling,
+    );
     const record = await this.store.create(minted.input);
     return this.toSession(record, minted.plaintext);
   }
@@ -352,14 +379,22 @@ export class TokenService {
     userId: string,
     familyId: string,
     now: Date,
+    familyStartedAt: Date,
     expiresAtCeiling?: Date,
   ): { plaintext: string; input: NewRefreshToken } {
     const plaintext = randomBytes(REFRESH_TOKEN_BYTES).toString("base64url");
-    const fullLife = new Date(now.getTime() + this.options.refreshTokenTtlSeconds * 1000);
-    const expiresAt =
-      expiresAtCeiling !== undefined && expiresAtCeiling.getTime() < fullLife.getTime()
-        ? expiresAtCeiling
-        : fullLife;
+
+    // Three bounds, and the earliest wins:
+    //   the idle timeout   — how long this token may sit unused
+    //   the absolute cap   — how long the sign-in itself may live, however often it rotates
+    //   the grace ceiling  — a replay sibling may not outlive the token it stands in for
+    const candidates = [
+      new Date(now.getTime() + this.options.refreshTokenTtlSeconds * 1000),
+      new Date(familyStartedAt.getTime() + this.options.absoluteSessionMaxSeconds * 1000),
+    ];
+    if (expiresAtCeiling !== undefined) candidates.push(expiresAtCeiling);
+
+    const expiresAt = candidates.reduce((a, b) => (a.getTime() <= b.getTime() ? a : b));
 
     return {
       plaintext,
@@ -368,6 +403,7 @@ export class TokenService {
         familyId,
         tokenHash: hashRefreshToken(plaintext),
         expiresAt,
+        familyStartedAt,
       },
     };
   }

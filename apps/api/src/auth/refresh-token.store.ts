@@ -22,6 +22,7 @@ function toRecord(row: RefreshTokenRow): RefreshTokenRecord {
     revokedAt: row.revokedAt,
     replacedById: row.replacedById,
     createdAt: row.createdAt,
+    familyStartedAt: row.familyStartedAt,
   };
 }
 
@@ -59,6 +60,7 @@ export class PrismaRefreshTokenStore extends RefreshTokenStore {
         familyId: token.familyId,
         tokenHash: token.tokenHash,
         expiresAt: token.expiresAt,
+        familyStartedAt: token.familyStartedAt,
       },
     });
     return toRecord(row);
@@ -106,6 +108,7 @@ export class PrismaRefreshTokenStore extends RefreshTokenStore {
           familyId: successor.familyId,
           tokenHash: successor.tokenHash,
           expiresAt: successor.expiresAt,
+          familyStartedAt: successor.familyStartedAt,
         },
       });
 

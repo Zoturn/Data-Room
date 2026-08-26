@@ -45,6 +45,7 @@ import { UserRepository } from "./user.repository";
         accessTokenTtlSeconds: config.get("ACCESS_TOKEN_TTL_SECONDS"),
         refreshTokenTtlSeconds: config.get("REFRESH_TOKEN_TTL_SECONDS"),
         rotationGraceSeconds: config.get("REFRESH_ROTATION_GRACE_SECONDS"),
+        absoluteSessionMaxSeconds: config.get("ABSOLUTE_SESSION_MAX_SECONDS"),
       }),
       inject: [ConfigService],
     },

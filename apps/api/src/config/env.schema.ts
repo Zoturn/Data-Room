@@ -73,6 +73,19 @@ export const envSchema = z.object({
   REFRESH_ROTATION_GRACE_SECONDS: z.coerce.number().int().nonnegative().default(10),
 
   /**
+   * The longest a single sign-in may live, however diligently it is rotated.
+   *
+   * REFRESH_TOKEN_TTL_SECONDS is an *idle* timeout — every rotation pushes it forward — so on
+   * its own a session used weekly never ends, and neither does a stolen refresh token being
+   * rotated weekly by someone else. This is the bound that eventually forces a real sign-in.
+   */
+  ABSOLUTE_SESSION_MAX_SECONDS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(30 * 24 * 60 * 60),
+
+  /**
    * Cookie policy is configuration, not code. Production is cross-site
    * (Vercel calling the API host) and needs SameSite=None, which browsers only
    * accept with Secure, which needs HTTPS. Locally the pair differs only by port —
