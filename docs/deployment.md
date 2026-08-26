@@ -120,18 +120,31 @@ Railway and Render both work. Railway is quicker; Render's free tier sleeps and 
 2. **Settings → Root Directory**: leave at the repository root. This is a pnpm workspace, so
    the build must run from the top, and `railpack.json` in the repo root already describes
    the whole build.
-3. **Build and start commands**: leave both blank. `railpack.json` pins them:
+3. **Build and start commands**: leave both blank. `railpack.json` in the repo root
+   describes the build:
 
-   - install — `corepack enable pnpm && pnpm install --frozen-lockfile`
-   - build — build `packages/shared`, generate the Prisma client, build the API
-   - start — run pending migrations, then start the API
+   - it does **not** override the install step — the Node provider already knows how to
+     copy the workspace manifests and run `pnpm install` for a pnpm workspace
+   - `build` is overridden to build only `packages/shared`, generate the Prisma client and
+     build the API, so the deploy does not also build the Next.js app it will never serve
+   - `deploy.startCommand` runs pending migrations, then starts the API
 
-   Auto-detection cannot infer this from a workspace containing two apps, and the failure is
-   unhelpful: `Railpack could not determine how to build the app`. Committing the config also
-   means the deploy is reviewable in the repo rather than living only in a dashboard.
+   > **Do not override the `install` step.** A Railpack step declares the filesystem it
+   > operates on, so replacing `install` also replaces the part that copies `package.json`
+   > into the layer. The result is `[ERR_PNPM_NO_PKG_MANIFEST] No package.json found in
+/app`, which reads like a missing file but is actually a step that was never given one.
+   > Override `commands` on the steps you need to change and leave the rest to the provider.
 
    Note this deploys **the API only**. The web app goes to Vercel in step 4 — one service
    cannot start both.
+
+   If Railpack keeps fighting you, delete `railpack.json` and set these two in the Railway
+   dashboard instead. It is less reviewable, but it is a supported path and it works:
+
+   ```
+   Build:  pnpm install --frozen-lockfile && pnpm --filter @data-room/shared build && pnpm --filter @data-room/api prisma:generate && pnpm --filter @data-room/api build
+   Start:  pnpm --filter @data-room/api prisma:deploy && pnpm --filter @data-room/api start
+   ```
 
 4. **Deploy from the `main` branch.** Railway defaults to it. Make sure the code has actually
    been merged there: a branch-per-task-group workflow leaves `main` holding nothing but the

@@ -1,13 +1,7 @@
 {
   "$schema": "https://schema.railpack.com",
   "provider": "node",
-  "packages": {
-    "node": "22"
-  },
   "steps": {
-    "install": {
-      "commands": ["corepack enable pnpm", "pnpm install --frozen-lockfile"]
-    },
     "build": {
       "commands": [
         "pnpm --filter @data-room/shared build",
