@@ -7,7 +7,7 @@ Three services, all on free tiers:
 | Service           | Hosts                     | Why                                                                        |
 | ----------------- | ------------------------- | -------------------------------------------------------------------------- |
 | Supabase          | Postgres and file storage | One provider for both, with signed upload URLs built in                    |
-| Railway or Render | `apps/api`                | The NestJS server needs a long-running process, which Vercel does not give |
+| Railway           | `apps/api`                | The NestJS server needs a long-running process, which Vercel does not give |
 | Vercel            | `apps/web`                | Next.js deploys there with no configuration                                |
 
 You will end up with two public URLs to put in the README.

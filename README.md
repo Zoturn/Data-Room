@@ -47,7 +47,7 @@ Only PDFs are accepted, up to 50 MB.
 | Storage  | Supabase — Postgres and Storage                                                        |
 | Auth     | Argon2id passwords, JWT access + rotating refresh in httpOnly cookies                  |
 | Testing  | Jest (units, services) and Cypress (API, components, end-to-end)                       |
-| Hosting  | Vercel (web), Railway or Render (api), Supabase (data and blobs)                       |
+| Hosting  | Vercel (web), Railway (api), Supabase (Postgres and private object storage)            |
 
 ## Design decisions
 
