@@ -45,7 +45,7 @@ Changes are built in this order, each archived before the next begins:
 | Order | Change                      | Delivers                                          |
 | ----- | --------------------------- | ------------------------------------------------- |
 | 1     | `add-project-foundation`    | monorepo, contract, env, health, CI, deployment   |
-| 2     | `add-authentication`        | email/password and Google sign-in, sessions       |
+| 2     | `add-authentication`        | email/password sign-in, sessions, route guards    |
 | 3     | `add-data-room-tree`        | Data Room, folders, breadcrumbs, recursive delete |
 | 4     | `add-file-management`       | upload, view, rename, move, delete                |
 | 5     | `add-sharing`               | public links, permissioned shares, revocation     |

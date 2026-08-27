@@ -104,14 +104,10 @@ export function submitFailureFrom(error: unknown, knownFields: readonly string[]
       return { fields: { email: error.message }, formError: null };
 
     case "INVALID_CREDENTIALS":
-      // The API answers identically for an unknown address, a wrong password and a
-      // Google-only account, so that a stranger cannot use this form to discover who has
-      // an account. The message must stay just as uninformative — and pointing at Google
-      // is what rescues the one honest user this uniformity inconveniences.
-      return {
-        fields: {},
-        formError: `${error.message} If you signed up with Google, continue with Google instead.`,
-      };
+      // The API answers identically for an unknown address and a wrong password, so that a
+      // stranger cannot use this form to discover who has an account. The message is passed
+      // through unchanged, because making it more helpful here would undo that.
+      return { fields: {}, formError: error.message };
 
     case "RATE_LIMITED":
       return { fields: {}, formError: "Too many attempts. Wait a moment and try again." };

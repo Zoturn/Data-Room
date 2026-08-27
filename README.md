@@ -23,7 +23,7 @@ with the final change.
 - **Folders** — create, nest, rename, and delete with a warning that states exactly how many folders and files will be removed. Breadcrumb navigation at any depth.
 - **Files** — upload several PDFs at once by drag-and-drop with per-file progress, view them in the app, rename, move between folders, delete. Name conflicts resolve predictably.
 - **Sharing** — share the Data Room, a folder, or a single file, read-only, either as a public link or to named people who must sign in. Access covers everything nested inside. The owner can revoke at any time, immediately.
-- **Accounts** — email and password, or Google. A Data Room is invisible to everyone but its owner until it is shared.
+- **Accounts** — email and password. A Data Room is invisible to everyone but its owner until it is shared.
 - **Extra credit** — filename search across the Data Room, and optional file versioning on a name conflict.
 
 ## Stack
@@ -33,7 +33,7 @@ with the final change.
 | Frontend | Next.js 15 (App Router), React, TypeScript, Tailwind, shadcn/ui, TanStack Query        |
 | Backend  | NestJS 11, Prisma, PostgreSQL                                                          |
 | Storage  | Supabase — Postgres and Storage                                                        |
-| Auth     | Argon2id passwords and Google OAuth, JWT access + rotating refresh in httpOnly cookies |
+| Auth     | Argon2id passwords, JWT access + rotating refresh in httpOnly cookies                  |
 | Testing  | Jest (units, services) and Cypress (API, components, end-to-end)                       |
 | Hosting  | Vercel (web), Railway or Render (api), Supabase (data and blobs)                       |
 
@@ -61,8 +61,7 @@ erDiagram
     User {
         uuid id PK
         citext email UK
-        text passwordHash "null for Google-only"
-        text googleId UK "null, reserved"
+        text passwordHash "argon2id"
     }
     RefreshToken {
         uuid id PK
@@ -289,16 +288,23 @@ openspec validate --all --strict
 
 Conventions live in `.claude/rules/*.md` and load automatically for the files they govern; `CLAUDE.md` files carry orientation only. Formatting, test companionship, post-commit test runs and post-archive documentation checks are hooks, so they happen without anyone remembering them.
 
-### Roadmap
+### What shipped
 
-| Order | Change                      | Status                   |
-| ----- | --------------------------- | ------------------------ |
-| 1     | `add-project-foundation`    | specified                |
-| 2     | `add-authentication`        | specified                |
-| 3     | `add-data-room-tree`        | specified                |
-| 4     | `add-file-management`       | specified                |
-| 5     | `add-sharing`               | specified                |
-| 6     | `add-search-and-versioning` | specified (extra credit) |
+Each change was built, verified and archived in order. An archived change's specs are folded
+into `openspec/specs/`, which is therefore a description of the system as it stands rather than
+of what was once intended.
+
+| Order | Change                      | Delivered                                             | Status                    |
+| ----- | --------------------------- | ----------------------------------------------------- | ------------------------- |
+| 1     | `add-project-foundation`    | monorepo, contract, env, health, CI, deployment        | archived                  |
+| 2     | `add-authentication`        | email/password sessions, rotation, route guards        | archived                  |
+| 3     | `add-data-room-tree`        | Data Room, folders, breadcrumbs, recursive delete      | archived                  |
+| 4     | `add-file-management`       | upload, view, rename, move, delete                     | archived                  |
+| 5     | `add-sharing`               | public links, permissioned grants, revocation          | archived                  |
+| 6     | `add-search-and-versioning` | filename search, versioning                            | specified, cut — see below |
+
+The task lists of the archived changes record what was cut and why, next to the task it was cut
+from — the Cypress specs in particular, each with the manual verification that stood in for it.
 
 ## Use of AI
 
@@ -347,7 +353,7 @@ Left out on purpose, with the reason rather than an apology:
 | Cut | Why |
 | --- | --- |
 | **Search and file versioning** | The task marks both as extra credit. Specified in `add-search-and-versioning` and not built. |
-| **Google sign-in** | The task asks for Google *or* email/password. Email/password ships; the model already carries a unique nullable `googleId` and the account-linking rule, so adding it is a provider and a callback rather than a migration. |
+| **Google sign-in** | The task asks for Google *or* email and password, and email and password is what shipped. The half-built column and its unique index were removed rather than left as a promise nothing kept — adding a provider later is one additive migration against a table where no row ever held a value. |
 | **Password reset and email verification** | Both need transactional email, which is an integration rather than a feature of this product. |
 | **Emailing share invitations** | Same reason. A restricted share returns its link to the owner, who sends it however they already talk to that person. |
 | **Editor role** | `Share.role` and `ShareGrant.role` exist and the resolver already returns the most permissive match, so this is an enum value and a capability matrix — but a role enforced on some paths and not others is worse than no role, so it is deliberately unbuilt. See ["How it scales"](#how-it-scales). |

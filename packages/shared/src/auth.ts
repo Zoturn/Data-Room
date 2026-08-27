@@ -48,17 +48,16 @@ export type LoginInput = z.infer<typeof loginInputSchema>;
 
 /**
  * The caller, as the browser is allowed to see them. `.strict()` is the security control:
- * credential material (`passwordHash`, `googleId`, tokens) cannot ride along on a response
- * by accident, because an extra key fails the parse instead of being quietly stripped.
+ * credential material — a password digest, a token — cannot ride along on a response by
+ * accident, because an extra key fails the parse instead of being quietly stripped.
  */
 export const sessionUserSchema = z
   .object({
     id: z.string().min(1),
     email: z.string().min(1),
     displayName: z.string().min(1),
-    /** Which sign-in methods are linked — the interface offers "set a password" from these, never the secrets themselves. */
+    /** That a credential exists, never the credential. Every account has one today. */
     hasPassword: z.boolean(),
-    hasGoogle: z.boolean(),
   })
   .strict();
 

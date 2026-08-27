@@ -2,7 +2,7 @@
 
 The NestJS backend. It owns the data model, all business rules and every authorisation decision. The frontend is a client of this service and re-implements none of it.
 
-**Stack:** NestJS 11 · Prisma · PostgreSQL (Supabase) · Supabase Storage · Passport (JWT, Google) · Jest and Cypress.
+**Stack:** NestJS 11 · Prisma · PostgreSQL (Supabase) · Supabase Storage · Jest and Cypress.
 
 ## Layout
 
@@ -10,13 +10,12 @@ The NestJS backend. It owns the data model, all business rules and every authori
 src/
   config/      env schema and typed access
   prisma/      PrismaService
-  auth/        registration, login, Google, tokens, guards
+  auth/        registration, login, tokens, guards
   data-room/   the owned root container
   folders/     the node tree
   files/       file nodes and the upload pipeline
   storage/     blob storage behind one interface
   sharing/     shares, grants and access resolution
-  search/      permission-scoped name search
   common/      error envelope, filters, pipes, pagination
 prisma/        schema and migrations
 cypress/       API end-to-end specs

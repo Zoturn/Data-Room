@@ -1,6 +1,5 @@
 import { Test } from "@nestjs/testing";
 import { Prisma } from "@prisma/client";
-import { NotFoundError } from "../common/errors/domain-error";
 import { PrismaService } from "../prisma/prisma.service";
 import { EmailAlreadyRegisteredError } from "./auth.errors";
 import { UserRepository, type UserRecord } from "./user.repository";
@@ -31,7 +30,6 @@ const OWNER: UserRow = {
   email: "owner@acme.com",
   displayName: "Owner",
   passwordHash: "$argon2id$v=19$m=19456,p=1,t=2$c2FsdA$aGFzaA",
-  googleId: null,
 };
 
 /** Every column the repository is allowed to read, and nothing else. */
@@ -40,7 +38,6 @@ const EXPECTED_SELECT = {
   email: true,
   displayName: true,
   passwordHash: true,
-  googleId: true,
 };
 
 function uniqueViolation(target?: string | string[]): Prisma.PrismaClientKnownRequestError {
@@ -103,14 +100,6 @@ describe("UserRepository", () => {
       });
     });
 
-    it("looks a user up by google id", async () => {
-      await users.findByGoogleId("google-subject-1");
-
-      expect(prismaUser.findUnique).toHaveBeenCalledWith({
-        where: { googleId: "google-subject-1" },
-        select: EXPECTED_SELECT,
-      });
-    });
 
     it("returns null for an address nobody registered", async () => {
       await expect(users.findByEmail("nobody@acme.com")).resolves.toBeNull();
@@ -122,7 +111,6 @@ describe("UserRepository", () => {
       expect(Object.keys(EXPECTED_SELECT).sort()).toEqual([
         "displayName",
         "email",
-        "googleId",
         "id",
         "passwordHash",
       ]);
@@ -203,72 +191,6 @@ describe("UserRepository", () => {
       await expect(
         users.createWithPassword({ email: "new@acme.com", passwordHash: "d", displayName: "N" }),
       ).rejects.toBe(outage);
-    });
-  });
-
-  describe("createWithGoogle", () => {
-    it("inserts a Google-only account with no password digest", async () => {
-      await users.createWithGoogle({
-        email: "new@acme.com",
-        googleId: "google-subject-1",
-        displayName: "New",
-      });
-
-      expect(prismaUser.create).toHaveBeenCalledWith({
-        data: { email: "new@acme.com", googleId: "google-subject-1", displayName: "New" },
-        select: EXPECTED_SELECT,
-      });
-    });
-
-    it("maps a unique violation on email to the taken-address message", async () => {
-      prismaUser.create.mockRejectedValue(uniqueViolation(["email"]));
-
-      await expect(
-        users.createWithGoogle({ email: OWNER.email, googleId: "g", displayName: "O" }),
-      ).rejects.toThrow(/email address already exists/);
-    });
-
-    it("distinguishes a unique violation on google_id from one on email", async () => {
-      prismaUser.create.mockRejectedValue(uniqueViolation(["google_id"]));
-
-      await expect(
-        users.createWithGoogle({ email: "new@acme.com", googleId: "g", displayName: "N" }),
-      ).rejects.toThrow(/Google account is already linked/);
-    });
-  });
-
-  describe("linkGoogleAccount", () => {
-    it("attaches the identity and returns the updated user", async () => {
-      const linked: UserRow = { ...OWNER, googleId: "google-subject-1" };
-      prismaUser.update.mockResolvedValue(linked);
-
-      await expect(users.linkGoogleAccount(OWNER.id, "google-subject-1")).resolves.toEqual(linked);
-      expect(prismaUser.update).toHaveBeenCalledWith({
-        where: { id: OWNER.id },
-        data: { googleId: "google-subject-1" },
-        select: EXPECTED_SELECT,
-      });
-    });
-
-    it("maps P2025 to a domain not-found rather than leaking the Prisma code", async () => {
-      prismaUser.update.mockRejectedValue(prismaError("P2025"));
-
-      await expect(users.linkGoogleAccount(OWNER.id, "g")).rejects.toBeInstanceOf(NotFoundError);
-    });
-
-    it("refuses when the google id is already attached to a different account", async () => {
-      prismaUser.update.mockRejectedValue(uniqueViolation(["google_id"]));
-
-      await expect(users.linkGoogleAccount(OWNER.id, "g")).rejects.toThrow(
-        /Google account is already linked/,
-      );
-    });
-
-    it("rethrows an unrelated Prisma failure", async () => {
-      const failure = prismaError("P1001");
-      prismaUser.update.mockRejectedValue(failure);
-
-      await expect(users.linkGoogleAccount(OWNER.id, "g")).rejects.toBe(failure);
     });
   });
 });

@@ -7,7 +7,6 @@ const user: SessionUser = {
   email: "owner@acme.com",
   displayName: "Owner",
   hasPassword: true,
-  hasGoogle: false,
 };
 
 const retry = jest.fn();

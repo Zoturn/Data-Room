@@ -1,9 +1,8 @@
 import { Test } from "@nestjs/testing";
 import { sessionUserSchema, type LoginInput } from "@data-room/shared";
-import { AuthService, type GoogleProfile } from "./auth.service";
+import { AuthService } from "./auth.service";
 import {
   EmailAlreadyRegisteredError,
-  GoogleEmailNotVerifiedError,
   InvalidCredentialsError,
   UnauthenticatedError,
 } from "./auth.errors";
@@ -12,14 +11,12 @@ import { PasswordService } from "./password.service";
 import { TokenService, type IssuedSession } from "./token.service";
 import {
   UserRepository,
-  type NewGoogleUser,
   type NewPasswordUser,
   type UserRecord,
 } from "./user.repository";
 
 /**
  * Covers auth-and-guards.md rules 3 (one normalised email everywhere), 4 (the uniform 401)
- * and 9 (Google requires a verified address and links rather than duplicating).
  *
  * Everything below the service is substituted: Argon2id is deliberately slow, and the point
  * of these tests is the decisions the service makes, not the cryptography — which
@@ -28,10 +25,7 @@ import {
 type UserRepositoryStub = {
   findById: jest.Mock<Promise<UserRecord | null>, [string]>;
   findByEmail: jest.Mock<Promise<UserRecord | null>, [string]>;
-  findByGoogleId: jest.Mock<Promise<UserRecord | null>, [string]>;
   createWithPassword: jest.Mock<Promise<UserRecord>, [NewPasswordUser]>;
-  createWithGoogle: jest.Mock<Promise<UserRecord>, [NewGoogleUser]>;
-  linkGoogleAccount: jest.Mock<Promise<UserRecord>, [string, string]>;
 };
 
 type PasswordServiceStub = {
@@ -51,15 +45,14 @@ const OWNER: UserRecord = {
   email: "owner@acme.com",
   displayName: "Owner",
   passwordHash: REAL_DIGEST,
-  googleId: null,
 };
 
-const GOOGLE_ONLY: UserRecord = {
+/** An account whose password digest is null — the state the nullable column allows. */
+const NO_PASSWORD: UserRecord = {
   id: "22222222-2222-4222-8222-222222222222",
-  email: "google@acme.com",
-  displayName: "Google Only",
+  email: "no-password@acme.com",
+  displayName: "No Password",
   passwordHash: null,
-  googleId: "google-subject-1",
 };
 
 const SESSION: IssuedSession = {
@@ -75,12 +68,7 @@ function buildUsers(): UserRepositoryStub {
   return {
     findById: jest.fn<Promise<UserRecord | null>, [string]>().mockResolvedValue(null),
     findByEmail: jest.fn<Promise<UserRecord | null>, [string]>().mockResolvedValue(null),
-    findByGoogleId: jest.fn<Promise<UserRecord | null>, [string]>().mockResolvedValue(null),
     createWithPassword: jest.fn<Promise<UserRecord>, [NewPasswordUser]>().mockResolvedValue(OWNER),
-    createWithGoogle: jest.fn<Promise<UserRecord>, [NewGoogleUser]>().mockResolvedValue(OWNER),
-    linkGoogleAccount: jest
-      .fn<Promise<UserRecord>, [string, string]>()
-      .mockResolvedValue({ ...OWNER, googleId: "google-subject-1" }),
   };
 }
 
@@ -170,8 +158,8 @@ describe("AuthService", () => {
 
   describe("register", () => {
     it("normalises the email before it is stored", async () => {
-      // Rule 3: one definition of "the same address", or a later Google sign-in or share
-      // grant resolves to a different person.
+      // Rule 3: one definition of "the same address", or a later share grant resolves to a
+      // different person.
       await auth.register({ email: "  Owner@ACME.com  ", password: PASSWORD });
 
       expect(users.createWithPassword).toHaveBeenCalledWith(
@@ -232,7 +220,6 @@ describe("AuthService", () => {
         email: OWNER.email,
         displayName: OWNER.displayName,
         hasPassword: true,
-        hasGoogle: false,
       });
     });
 
@@ -271,30 +258,30 @@ describe("AuthService", () => {
         expect(error).toBeInstanceOf(InvalidCredentialsError);
       });
 
-      it("rejects a password login against a Google-only account", async () => {
-        users.findByEmail.mockResolvedValue(GOOGLE_ONLY);
+      it("rejects a login against an account that has no password digest", async () => {
+        users.findByEmail.mockResolvedValue(NO_PASSWORD);
 
         const error = await captureLoginFailure(auth, {
-          email: GOOGLE_ONLY.email,
+          email: NO_PASSWORD.email,
           password: PASSWORD,
         });
 
         expect(error).toBeInstanceOf(InvalidCredentialsError);
       });
 
-      it("rejects a Google-only account even if the verifier reports a match", async () => {
+      it("rejects it even if the verifier reports a match", async () => {
         // Defence in depth. A null digest can never verify, but the decision must not rest
         // on that: an account with no password credential cannot be entered with one.
-        users.findByEmail.mockResolvedValue(GOOGLE_ONLY);
+        users.findByEmail.mockResolvedValue(NO_PASSWORD);
         passwords.verify.mockResolvedValue(true);
 
         await expect(
-          auth.login({ email: GOOGLE_ONLY.email, password: PASSWORD }),
+          auth.login({ email: NO_PASSWORD.email, password: PASSWORD }),
         ).rejects.toBeInstanceOf(InvalidCredentialsError);
         expect(tokens.issue).not.toHaveBeenCalled();
       });
 
-      it("gives all three failures the same class, code, status and message", async () => {
+      it("gives every failure the same class, code, status and message", async () => {
         users.findByEmail.mockResolvedValue(null);
         const unknownAddress = await captureLoginFailure(auth, {
           email: "nobody@acme.com",
@@ -308,15 +295,15 @@ describe("AuthService", () => {
           password: "wrong",
         });
 
-        users.findByEmail.mockResolvedValue(GOOGLE_ONLY);
-        const googleOnly = await captureLoginFailure(auth, {
-          email: GOOGLE_ONLY.email,
+        users.findByEmail.mockResolvedValue(NO_PASSWORD);
+        const noDigest = await captureLoginFailure(auth, {
+          email: NO_PASSWORD.email,
           password: PASSWORD,
         });
 
         // Any difference here — even a stray word — is a user-enumeration oracle.
         expect(describeFailure(wrongPassword)).toEqual(describeFailure(unknownAddress));
-        expect(describeFailure(googleOnly)).toEqual(describeFailure(unknownAddress));
+        expect(describeFailure(noDigest)).toEqual(describeFailure(unknownAddress));
       });
 
       it("never names the address or hints that an account exists", async () => {
@@ -358,14 +345,14 @@ describe("AuthService", () => {
         expect(digest.length).toBeGreaterThan(0);
       });
 
-      it("still verifies a password against a Google-only account", async () => {
-        users.findByEmail.mockResolvedValue(GOOGLE_ONLY);
+      it("still pays for a verify against an account with no digest", async () => {
+        users.findByEmail.mockResolvedValue(NO_PASSWORD);
 
-        await captureLoginFailure(auth, { email: GOOGLE_ONLY.email, password: PASSWORD });
+        await captureLoginFailure(auth, { email: NO_PASSWORD.email, password: PASSWORD });
 
         const [digest] = verifyArguments(passwords);
         expect(passwords.verify).toHaveBeenCalledTimes(1);
-        expect(digest).not.toBe(GOOGLE_ONLY.passwordHash);
+        expect(digest).not.toBe(NO_PASSWORD.passwordHash);
       });
 
       it("verifies against the stored digest when the account does have a password", async () => {
@@ -419,157 +406,6 @@ describe("AuthService", () => {
     });
   });
 
-  describe("linkOrCreateFromGoogle", () => {
-    const profile: GoogleProfile = {
-      googleId: "google-subject-1",
-      email: "Owner@ACME.com",
-      emailVerified: true,
-      displayName: "Ada Lovelace",
-    };
-
-    it("refuses a profile whose email Google has not verified", async () => {
-      await expect(
-        auth.linkOrCreateFromGoogle({ ...profile, emailVerified: false }),
-      ).rejects.toBeInstanceOf(GoogleEmailNotVerifiedError);
-    });
-
-    it("does not touch the database at all for an unverified profile", async () => {
-      // The refusal must come before any lookup: an unverified address is an unproven claim
-      // about somebody else's account.
-      await expect(
-        auth.linkOrCreateFromGoogle({ ...profile, emailVerified: false }),
-      ).rejects.toBeInstanceOf(GoogleEmailNotVerifiedError);
-
-      expect(users.findByGoogleId).not.toHaveBeenCalled();
-      expect(users.findByEmail).not.toHaveBeenCalled();
-      expect(users.createWithGoogle).not.toHaveBeenCalled();
-      expect(tokens.issue).not.toHaveBeenCalled();
-    });
-
-    it("returns the account the identity is already attached to", async () => {
-      users.findByGoogleId.mockResolvedValue(GOOGLE_ONLY);
-
-      const result = await auth.linkOrCreateFromGoogle(profile);
-
-      expect(result.user.id).toBe(GOOGLE_ONLY.id);
-      expect(users.createWithGoogle).not.toHaveBeenCalled();
-      expect(users.linkGoogleAccount).not.toHaveBeenCalled();
-    });
-
-    it("finds an already-linked account by subject id even when the email changed", async () => {
-      // Google addresses can change; the subject id cannot. Matching on it first is what
-      // keeps a renamed account from being treated as a stranger.
-      users.findByGoogleId.mockResolvedValue(GOOGLE_ONLY);
-
-      await auth.linkOrCreateFromGoogle({ ...profile, email: "renamed@acme.com" });
-
-      expect(users.findByEmail).not.toHaveBeenCalled();
-    });
-
-    it("links to the existing password account rather than creating a second one", async () => {
-      users.findByEmail.mockResolvedValue(OWNER);
-
-      await auth.linkOrCreateFromGoogle(profile);
-
-      expect(users.linkGoogleAccount).toHaveBeenCalledWith(OWNER.id, "google-subject-1");
-      expect(users.createWithGoogle).not.toHaveBeenCalled();
-    });
-
-    it("matches the existing account on the normalised address", async () => {
-      users.findByEmail.mockResolvedValue(OWNER);
-
-      await auth.linkOrCreateFromGoogle(profile);
-
-      // `Owner@ACME.com` and `owner@acme.com` are one person, or Google sign-in silently
-      // strands the user in an empty duplicate account.
-      expect(users.findByEmail).toHaveBeenCalledWith("owner@acme.com");
-    });
-
-    it("reports the linked account as having both sign-in methods", async () => {
-      users.findByEmail.mockResolvedValue(OWNER);
-      users.linkGoogleAccount.mockResolvedValue({ ...OWNER, googleId: "google-subject-1" });
-
-      const result = await auth.linkOrCreateFromGoogle(profile);
-
-      expect(result.user).toMatchObject({ hasPassword: true, hasGoogle: true });
-    });
-
-    it("creates an account when the address is genuinely new", async () => {
-      const created: UserRecord = {
-        ...GOOGLE_ONLY,
-        email: "owner@acme.com",
-        displayName: "Ada Lovelace",
-      };
-      users.createWithGoogle.mockResolvedValue(created);
-
-      const result = await auth.linkOrCreateFromGoogle(profile);
-
-      expect(users.createWithGoogle).toHaveBeenCalledWith({
-        email: "owner@acme.com",
-        googleId: "google-subject-1",
-        displayName: "Ada Lovelace",
-      });
-      expect(result.user).toMatchObject({ hasPassword: false, hasGoogle: true });
-    });
-
-    it("falls back to the local part when Google sends no usable name", async () => {
-      await auth.linkOrCreateFromGoogle({ ...profile, displayName: "   " });
-
-      expect(users.createWithGoogle).toHaveBeenCalledWith(
-        expect.objectContaining({ displayName: "owner" }),
-      );
-    });
-
-    it("links to the winner when a concurrent registration wins the race", async () => {
-      // Between the lookup and the insert somebody registered that address. The sign-in was
-      // valid, so it joins the account that now exists instead of failing.
-      users.createWithGoogle.mockRejectedValue(new EmailAlreadyRegisteredError());
-      users.findByEmail.mockResolvedValueOnce(null).mockResolvedValueOnce(OWNER);
-
-      const result = await auth.linkOrCreateFromGoogle(profile);
-
-      expect(users.linkGoogleAccount).toHaveBeenCalledWith(OWNER.id, "google-subject-1");
-      expect(result.user.id).toBe(OWNER.id);
-    });
-
-    it("surfaces the conflict if the re-read after a lost race finds nothing", async () => {
-      // Retrying forever would be a loop; one attempt, then the honest error.
-      const conflict = new EmailAlreadyRegisteredError();
-      users.createWithGoogle.mockRejectedValue(conflict);
-      users.findByEmail.mockResolvedValue(null);
-
-      await expect(auth.linkOrCreateFromGoogle(profile)).rejects.toBe(conflict);
-    });
-
-    it("refuses to move an address that is linked to a different Google identity", async () => {
-      // Re-linking would hand the account to whoever signed in most recently.
-      users.findByEmail.mockResolvedValue({ ...OWNER, googleId: "some-other-subject" });
-
-      await expect(auth.linkOrCreateFromGoogle(profile)).rejects.toBeInstanceOf(
-        EmailAlreadyRegisteredError,
-      );
-      expect(users.linkGoogleAccount).not.toHaveBeenCalled();
-      expect(tokens.issue).not.toHaveBeenCalled();
-    });
-
-    it("is idempotent when the same identity is presented twice", async () => {
-      users.findByEmail.mockResolvedValue({ ...OWNER, googleId: "google-subject-1" });
-
-      await auth.linkOrCreateFromGoogle(profile);
-
-      expect(users.linkGoogleAccount).not.toHaveBeenCalled();
-    });
-
-    it("issues a session for the resolved account", async () => {
-      users.findByGoogleId.mockResolvedValue(GOOGLE_ONLY);
-
-      const result = await auth.linkOrCreateFromGoogle(profile);
-
-      expect(tokens.issue).toHaveBeenCalledWith(GOOGLE_ONLY.id);
-      expect(result.session).toBe(SESSION);
-    });
-  });
-
   describe("toSessionUser", () => {
     it("produces a value that parses against the shared schema", () => {
       const parsed = sessionUserSchema.safeParse(auth.toSessionUser(OWNER));
@@ -577,38 +413,27 @@ describe("AuthService", () => {
       expect(parsed.success).toBe(true);
     });
 
-    it("carries the five session fields and nothing else", () => {
-      const sessionUser = auth.toSessionUser({ ...OWNER, googleId: "google-subject-1" });
+    it("carries the four session fields and nothing else", () => {
+      const sessionUser = auth.toSessionUser(OWNER);
 
       expect(Object.keys(sessionUser).sort()).toEqual([
         "displayName",
         "email",
-        "hasGoogle",
         "hasPassword",
         "id",
       ]);
     });
 
-    it("never exposes the password digest or the Google subject id", () => {
-      const serialised = JSON.stringify(
-        auth.toSessionUser({ ...OWNER, googleId: "google-subject-1" }),
-      );
+    it("never exposes the password digest", () => {
+      const serialised = JSON.stringify(auth.toSessionUser(OWNER));
 
       expect(serialised).not.toContain(REAL_DIGEST);
-      expect(serialised).not.toContain("google-subject-1");
       expect(serialised).not.toContain("passwordHash");
     });
 
-    it("reports which sign-in methods are linked, not the secrets behind them", () => {
-      expect(auth.toSessionUser(OWNER)).toMatchObject({ hasPassword: true, hasGoogle: false });
-      expect(auth.toSessionUser(GOOGLE_ONLY)).toMatchObject({
-        hasPassword: false,
-        hasGoogle: true,
-      });
-      expect(auth.toSessionUser({ ...OWNER, googleId: "google-subject-1" })).toMatchObject({
-        hasPassword: true,
-        hasGoogle: true,
-      });
+    it("reports that a credential exists, never the credential itself", () => {
+      expect(auth.toSessionUser(OWNER)).toMatchObject({ hasPassword: true });
+      expect(auth.toSessionUser(NO_PASSWORD)).toMatchObject({ hasPassword: false });
     });
   });
 

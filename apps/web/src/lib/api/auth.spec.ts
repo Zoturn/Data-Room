@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "@jest/globals";
-import { fetchSessionUser, googleSignInUrl, signOut } from "./auth";
+import { fetchSessionUser, signOut } from "./auth";
 import { ApiError } from "./errors";
 
 const originalFetch = globalThis.fetch;
@@ -40,7 +40,6 @@ describe("fetchSessionUser", () => {
       email: "owner@acme.com",
       displayName: "Owner",
       hasPassword: true,
-      hasGoogle: false,
     };
     respondWith(() => new Response(JSON.stringify(user), { status: 200 }));
 
@@ -78,16 +77,3 @@ describe("signOut", () => {
   });
 });
 
-describe("googleSignInUrl", () => {
-  const apiBaseUrl = process.env["NEXT_PUBLIC_API_URL"] ?? "http://localhost:3001/api";
-
-  it("points at the API, which owns the OAuth handshake", () => {
-    expect(googleSignInUrl()).toBe(`${apiBaseUrl}/auth/google`);
-  });
-
-  it("encodes the return destination so it cannot graft extra parameters onto the request", () => {
-    expect(googleSignInUrl("/rooms/a?b=1&c=2")).toBe(
-      `${apiBaseUrl}/auth/google?returnTo=%2Frooms%2Fa%3Fb%3D1%26c%3D2`,
-    );
-  });
-});

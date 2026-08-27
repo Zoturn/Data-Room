@@ -123,7 +123,6 @@ describe("sessionUserSchema", () => {
     email: "owner@acme.com",
     displayName: "Ada Lovelace",
     hasPassword: true,
-    hasGoogle: false,
   };
 
   it("accepts a user with both sign-in methods described", () => {
@@ -139,7 +138,7 @@ describe("sessionUserSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it.each(["googleId", "refreshToken", "accessToken"])(
+  it.each(["passwordHash", "refreshToken", "accessToken"])(
     "rejects the unexpected %s field rather than silently stripping it",
     (field) => {
       const result = sessionUserSchema.safeParse({ ...sessionUser, [field]: "secret" });
@@ -147,8 +146,8 @@ describe("sessionUserSchema", () => {
     },
   );
 
-  it("requires both linked-method flags, so the interface never guesses", () => {
-    const { hasGoogle: _omitted, ...withoutGoogleFlag } = sessionUser;
-    expect(sessionUserSchema.safeParse(withoutGoogleFlag).success).toBe(false);
+  it("requires the linked-method flag, so the interface never guesses", () => {
+    const { hasPassword: _omitted, ...withoutFlag } = sessionUser;
+    expect(sessionUserSchema.safeParse(withoutFlag).success).toBe(false);
   });
 });

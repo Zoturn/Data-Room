@@ -20,10 +20,8 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-/// A person. Identified by a normalised email, reachable through either sign-in method:
-/// a password credential, a linked Google account, or both. One human, one row — Google
-/// sign-in links to an existing user rather than creating a second account, or someone who
-/// signs up with a password and later clicks "Continue with Google" loses their Data Room.
+/// A person, identified by a normalised email. One human, one row: the unique index on the
+/// address is what a second credential type would link against rather than duplicating.
 model User {
   id String @id @default(uuid()) @db.Uuid
 
@@ -31,11 +29,8 @@ model User {
   /// enforced here so `Owner@Acme.com` and `owner@acme.com` cannot both exist.
   email String @unique
 
-  /// Null for an account that only ever signs in with Google. Argon2id.
+  /// Argon2id. Nullable so a future credential type need not backfill every row.
   passwordHash String? @map("password_hash")
-
-  /// Null until a Google account is linked.
-  googleId String? @unique @map("google_id")
 
   displayName String   @map("display_name")
   createdAt   DateTime @default(now()) @map("created_at")

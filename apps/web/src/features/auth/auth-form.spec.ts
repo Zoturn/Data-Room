@@ -100,7 +100,7 @@ describe("submitFailureFrom", () => {
     expect(failure.formError).toBe("Something the server said");
   });
 
-  it("points a rejected sign-in at Google without revealing which half was wrong", () => {
+  it("passes a rejected sign-in through without revealing which half was wrong", () => {
     const failure = submitFailureFrom(
       apiError({
         code: "INVALID_CREDENTIALS",
@@ -112,7 +112,7 @@ describe("submitFailureFrom", () => {
 
     expect(failure.fields).toEqual({});
     expect(failure.formError).toBe(
-      "Email or password is incorrect. If you signed up with Google, continue with Google instead.",
+      "Email or password is incorrect.",
     );
   });
 

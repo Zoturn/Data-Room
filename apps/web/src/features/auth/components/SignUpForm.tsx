@@ -6,7 +6,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { PASSWORD_MIN_LENGTH, registerInputSchema } from "@data-room/shared";
 import { Button } from "@/components/ui/button";
-import { googleSignInUrl } from "@/lib/api/auth";
 import {
   authScreenHref,
   safeRedirectPath,
@@ -106,17 +105,6 @@ export function SignUpForm() {
           {isSubmitting ? "Creating account…" : "Create account"}
         </Button>
       </form>
-
-      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-        <span className="h-px flex-1 bg-border" aria-hidden />
-        or
-        <span className="h-px flex-1 bg-border" aria-hidden />
-      </div>
-
-      {/* A real link, not a button: this leaves the origin for Google's consent screen. */}
-      <Button variant="outline" asChild>
-        <a href={googleSignInUrl(destination)}>Continue with Google</a>
-      </Button>
 
       <p className="text-center text-sm text-muted-foreground">
         Already have an account?{" "}

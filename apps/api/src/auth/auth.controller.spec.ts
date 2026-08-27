@@ -26,7 +26,6 @@ const sessionUser: SessionUser = {
   email: "owner@acme.com",
   displayName: "Owner",
   hasPassword: true,
-  hasGoogle: false,
 };
 
 function issuedSession(): IssuedSession {

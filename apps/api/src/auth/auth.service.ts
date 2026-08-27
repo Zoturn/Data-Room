@@ -8,8 +8,6 @@ import {
   type SessionUser,
 } from "@data-room/shared";
 import {
-  EmailAlreadyRegisteredError,
-  GoogleEmailNotVerifiedError,
   InvalidCredentialsError,
   UnauthenticatedError,
 } from "./auth.errors";
@@ -18,30 +16,13 @@ import { PasswordService } from "./password.service";
 import { TokenService, type IssuedSession } from "./token.service";
 import { UserRepository, type UserRecord } from "./user.repository";
 
-/**
- * What Google's userinfo response reduces to once the OAuth module has verified it. The
- * service never speaks to Google itself — see nestjs-architecture.md rule 11 — so this is
- * the whole contract between the two.
- */
-export type GoogleProfile = {
-  /** Google's stable subject id. The email can change; this cannot. */
-  googleId: string;
-  email: string;
-  /** Google's own attestation that the holder controls the address. */
-  emailVerified: boolean;
-  displayName?: string | undefined;
-};
-
 /** A signed-in caller and the tokens that prove it. The controller turns these into cookies. */
 export type AuthenticatedSession = {
   user: SessionUser;
   session: IssuedSession;
 };
 
-/**
- * Matches the bound in `registerInputSchema`, applied here as well because a Google profile
- * never passes through that schema and Google does not bound the name it returns.
- */
+/** Matches the bound in `registerInputSchema`. */
 const DISPLAY_NAME_MAX_LENGTH = 100;
 
 /**
@@ -117,10 +98,9 @@ export class AuthService implements OnModuleInit {
   /**
    * Verify a password and start a session.
    *
-   * Three different failures — no such address, wrong password, and a password login against
-   * an account that only has Google — must be indistinguishable, or the endpoint becomes an
-   * oracle for which addresses are registered and which of those have a password set
-   * (auth-and-guards.md rule 4). Same error, same message, and comparable timing:
+   * An unknown address and a wrong password must be indistinguishable, or the endpoint
+   * becomes an oracle for which addresses are registered (auth-and-guards.md rule 4). Same
+   * error, same message, and comparable timing:
    *
    * Timing is the part that is easy to get wrong. Returning early when the lookup misses
    * would skip Argon2id entirely, and Argon2id is ~100ms here — an attacker with a
@@ -133,8 +113,8 @@ export class AuthService implements OnModuleInit {
     const email = normalizeEmail(input.email);
     const user = await this.users.findByEmail(email);
 
-    // Covers both the unknown address and the Google-only account: neither has a digest, and
-    // both must still pay for a verify.
+    // An unknown address has no digest to verify, and skipping the work would answer faster
+    // than a real one — so it pays for a verify against a decoy instead.
     const digest = user?.passwordHash ?? (await this.decoy());
     const matches = await this.passwords.verify(digest, input.password);
 
@@ -143,23 +123,6 @@ export class AuthService implements OnModuleInit {
     }
 
     return this.startSession(user);
-  }
-
-  /**
-   * Sign in with Google, attaching the identity to the existing account for that address.
-   *
-   * One human is one row. Somebody who registered with a password and later clicks "Continue
-   * with Google" must land in the same Data Room, not in an empty second account — so the
-   * match is on the normalised email and the outcome is a link, never a duplicate.
-   */
-  async linkOrCreateFromGoogle(profile: GoogleProfile): Promise<AuthenticatedSession> {
-    // An unverified Google address is just a string its holder typed into a profile form.
-    // Trusting it would let anyone claim any address and, through the linking below, walk
-    // into the account that owns it. Google's attestation is the whole basis for the link.
-    if (!profile.emailVerified) throw new GoogleEmailNotVerifiedError();
-
-    const email = normalizeEmail(profile.email);
-    return this.startSession(await this.resolveGoogleUser(profile, email));
   }
 
   /** The caller behind an access token, for `GET /auth/me`. */
@@ -178,10 +141,9 @@ export class AuthService implements OnModuleInit {
    * The user as a browser may see them.
    *
    * Parsed rather than constructed: `sessionUserSchema` is `.strict()`, so if this object
-   * ever grows a `passwordHash`, a `googleId` or a token, the parse throws here instead of
-   * the value being quietly serialised into a response. `hasPassword` and `hasGoogle` are
-   * the shapes of those secrets, never the secrets — enough for the interface to offer
-   * "set a password" and nothing more.
+   * ever grows a `passwordHash` or a token, the parse throws here instead of the value being
+   * quietly serialised into a response. `hasPassword` is the shape of that secret, never the
+   * secret itself.
    */
   toSessionUser(user: UserRecord): SessionUser {
     return sessionUserSchema.parse({
@@ -189,51 +151,7 @@ export class AuthService implements OnModuleInit {
       email: user.email,
       displayName: user.displayName,
       hasPassword: user.passwordHash !== null,
-      hasGoogle: user.googleId !== null,
     });
-  }
-
-  private async resolveGoogleUser(profile: GoogleProfile, email: string): Promise<UserRecord> {
-    // Subject id first: it survives a Google-side address change, so an already-linked
-    // account is found even when the email no longer matches the one we stored.
-    const linked = await this.users.findByGoogleId(profile.googleId);
-    if (linked !== null) return linked;
-
-    const existing = await this.users.findByEmail(email);
-    if (existing !== null) return this.linkGoogle(existing, profile.googleId);
-
-    try {
-      return await this.users.createWithGoogle({
-        email,
-        googleId: profile.googleId,
-        displayName: resolveDisplayName(profile.displayName, email),
-      });
-    } catch (error) {
-      if (!(error instanceof EmailAlreadyRegisteredError)) throw error;
-
-      // Lost a race: between the lookup above and this insert, someone registered that
-      // address. The unique index is what guarantees one account per address, and this is
-      // how the loser of the race joins the winner's account rather than failing a sign-in
-      // that had nothing wrong with it.
-      const raced = await this.users.findByEmail(email);
-      if (raced === null) throw error;
-      return this.linkGoogle(raced, profile.googleId);
-    }
-  }
-
-  private async linkGoogle(user: UserRecord, googleId: string): Promise<UserRecord> {
-    if (user.googleId === googleId) return user;
-
-    // The address already carries a *different* Google identity. Re-linking would move the
-    // account to whoever signed in most recently, so refuse and leave the existing link
-    // alone — a support problem is better than a silent account takeover.
-    if (user.googleId !== null) {
-      throw new EmailAlreadyRegisteredError(
-        "That email address is already linked to a different Google account.",
-      );
-    }
-
-    return this.users.linkGoogleAccount(user.id, googleId);
   }
 
   private async startSession(user: UserRecord): Promise<AuthenticatedSession> {
@@ -247,7 +165,7 @@ export class AuthService implements OnModuleInit {
    * holds it.
    *
    * Here rather than in `register`, because every route into a session funnels through
-   * `startSession` — password registration, password sign-in and Google — and an invitation
+   * `startSession` — registration and sign-in alike — and an invitation
    * sent to somebody who already had an account must land on their *next* sign-in, not only
    * on a registration that will never happen again. Both sides of the comparison went through
    * `normalizeEmail`, which is what makes `Buyer@Acme.com` and `buyer@acme.com` one person.

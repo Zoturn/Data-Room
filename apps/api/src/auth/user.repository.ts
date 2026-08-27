@@ -1,6 +1,5 @@
 import { Injectable } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
-import { NotFoundError } from "../common/errors/domain-error";
 import { PrismaService } from "../prisma/prisma.service";
 import { EmailAlreadyRegisteredError } from "./auth.errors";
 
@@ -16,23 +15,14 @@ export type UserRecord = {
   id: string;
   email: string;
   displayName: string;
-  /** Argon2id digest. Null for an account that only ever signs in with Google. */
+  /** Argon2id digest. Nullable so a future credential type need not backfill it. */
   passwordHash: string | null;
-  /** Null until a Google account is linked. */
-  googleId: string | null;
 };
 
 /** A password registration. The caller has already normalised the email and hashed the password. */
 export type NewPasswordUser = {
   email: string;
   passwordHash: string;
-  displayName: string;
-};
-
-/** A first Google sign-in for an address nobody has registered. No password is ever set. */
-export type NewGoogleUser = {
-  email: string;
-  googleId: string;
   displayName: string;
 };
 
@@ -46,18 +36,9 @@ const USER_COLUMNS = {
   email: true,
   displayName: true,
   passwordHash: true,
-  googleId: true,
 } satisfies Prisma.UserSelect;
 
 const UNIQUE_VIOLATION = "P2002";
-const RECORD_NOT_FOUND = "P2025";
-
-/**
- * Shown when a Google identity is already attached to a different row. Vanishingly rare —
- * it needs two accounts to disagree about who owns one Google subject id — but overwriting
- * the link instead would hand an account to whoever signed in most recently.
- */
-const GOOGLE_ID_TAKEN = "That Google account is already linked to a different account.";
 
 /**
  * Which unique index a P2002 tripped, lower-cased, or `null` when the error is not a unique
@@ -88,10 +69,6 @@ function uniqueViolationTarget(error: unknown): string | null {
   return "";
 }
 
-function isRecordNotFound(error: unknown): boolean {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === RECORD_NOT_FOUND;
-}
-
 /**
  * Every Prisma call for `User`. Nothing outside this class touches `PrismaService` for a
  * user row, and no Prisma error code escapes it — see apps/api/.claude/rules/
@@ -115,10 +92,6 @@ export class UserRepository {
     return this.prisma.user.findUnique({ where: { email }, select: USER_COLUMNS });
   }
 
-  async findByGoogleId(googleId: string): Promise<UserRecord | null> {
-    return this.prisma.user.findUnique({ where: { googleId }, select: USER_COLUMNS });
-  }
-
   async createWithPassword(input: NewPasswordUser): Promise<UserRecord> {
     try {
       return await this.prisma.user.create({ data: input, select: USER_COLUMNS });
@@ -127,36 +100,6 @@ export class UserRepository {
       // the taken-address case.
       if (uniqueViolationTarget(error) === null) throw error;
       throw new EmailAlreadyRegisteredError();
-    }
-  }
-
-  async createWithGoogle(input: NewGoogleUser): Promise<UserRecord> {
-    try {
-      return await this.prisma.user.create({ data: input, select: USER_COLUMNS });
-    } catch (error) {
-      const target = uniqueViolationTarget(error);
-      if (target === null) throw error;
-      if (target.includes("google")) throw new EmailAlreadyRegisteredError(GOOGLE_ID_TAKEN);
-      throw new EmailAlreadyRegisteredError();
-    }
-  }
-
-  /**
-   * Attach a Google identity to an existing account. The caller has already established that
-   * this row has no Google identity yet; the unique index on `google_id` is what settles a
-   * race between two callers trying to attach the same one.
-   */
-  async linkGoogleAccount(userId: string, googleId: string): Promise<UserRecord> {
-    try {
-      return await this.prisma.user.update({
-        where: { id: userId },
-        data: { googleId },
-        select: USER_COLUMNS,
-      });
-    } catch (error) {
-      if (isRecordNotFound(error)) throw new NotFoundError("Account not found");
-      if (uniqueViolationTarget(error) === null) throw error;
-      throw new EmailAlreadyRegisteredError(GOOGLE_ID_TAKEN);
     }
   }
 }

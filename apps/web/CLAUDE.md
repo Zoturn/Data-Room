@@ -11,8 +11,8 @@ src/
   app/
     (auth)/      sign-in and sign-up
     (app)/       the owner's Data Room
-    (shared)/    public and permissioned share views
-  features/      folders, files, uploads, sharing, search — components, hooks, api calls
+    (shared)/    the recipient's view of a share, outside the session gate
+  features/      auth, data-room, files, sharing — components, hooks, api calls
   components/
     ui/          shadcn primitives, owned by this repo
   lib/api/       the API client, error parsing, query keys

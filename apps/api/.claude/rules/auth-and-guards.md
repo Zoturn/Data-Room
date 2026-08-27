@@ -15,16 +15,14 @@ paths:
 1. The JWT guard is registered globally. An endpoint is protected because nobody did anything; exposure requires an explicit `@Public()`. Adding `@Public()` is a security decision — say why in the pull request.
 2. Passwords are hashed with Argon2id and compared with the library's constant-time verify. Never log, return, or include a hash in any DTO.
 3. Emails are normalised (trim, lower-case) by the same shared function used everywhere, before storage and before every comparison. Grants, logins and account linking must agree on what one address means.
-4. Authentication failure is uniform: unknown email, wrong password and password login against a Google-only account all return 401 `INVALID_CREDENTIALS` with the same message and comparable timing. Do not add a helpful "no account with that email".
+4. Authentication failure is uniform: an unknown email and a wrong password both return 401 `INVALID_CREDENTIALS` with the same message and comparable timing. Do not add a helpful "no account with that email".
 5. Tokens travel only in cookies. `httpOnly` is unconditional, in every environment. Never accept a token from a query string or a body, and never write one to `localStorage`.
 6. `Secure` and `SameSite` are **configuration, not code**. They come from the env schema, never from an `if (isProd)` branch. See the local-development section below for the values and why they differ.
 7. The refresh cookie is scoped to the refresh endpoint path so it is not sent with ordinary requests. That path is the same in every environment.
 8. Refresh tokens are stored hashed with a `familyId` and rotate on every use. Presenting an already-rotated token revokes the whole family. A short grace window covers the client's own concurrent retry; anything beyond it is treated as theft.
-9. Google sign-in requires `email_verified`. Match on the normalised email and link to the existing user; never create a second account for the same address. Validate the OAuth `state` on every callback.
-10. The Google callback sets cookies and redirects to the frontend. It never returns JSON — the browser is mid-navigation.
-11. `@CurrentUser()` is the only way a handler obtains the caller. Do not read `request.user` directly in a service.
-12. Guards answer _may this caller proceed_ and nothing else. Resolving what a share permits belongs to the access resolver; see `sharing-authorization.md`.
-13. Rate-limit register, login, refresh and the public share surface. The limiter is per-instance in memory today — with more than one instance it needs a shared store, and that is a real change, not a config tweak.
+9. `@CurrentUser()` is the only way a handler obtains the caller. Do not read `request.user` directly in a service.
+10. Guards answer _may this caller proceed_ and nothing else. Resolving what a share permits belongs to the access resolver; see `sharing-authorization.md`.
+11. Rate-limit register, login, refresh and the public share surface. The limiter is per-instance in memory today — with more than one instance it needs a shared store, and that is a real change, not a config tweak.
 
 ## Local development with httpOnly cookies
 
@@ -44,8 +42,6 @@ Both sides still need the credentialed-CORS handshake, which is easy to get wron
 - The API must echo an explicit origin — `Access-Control-Allow-Origin: http://localhost:3000` — and send `Access-Control-Allow-Credentials: true`. A wildcard origin is rejected by the browser whenever credentials are involved.
 - The web client must send `credentials: "include"` on every request, including the refresh call.
 - Use `localhost` consistently on both sides. Mixing `localhost` and `127.0.0.1` makes them different sites and the cookie will not be sent.
-
-Google OAuth locally needs `http://localhost:3001/api/auth/google/callback` registered as an authorised redirect URI alongside the production one, and `WEB_APP_URL` pointing at `http://localhost:3000` so the callback redirects back to the dev frontend.
 
 If a browser ever does reject the local cookie — a hardened profile, or a device on the LAN testing against your machine — the fallback is to make the pair same-origin rather than to loosen the cookie: proxy `/api/*` from the Next.js dev server to the API, so the browser sees one origin and `SameSite` stops mattering. Never "fix" a local cookie problem by weakening the production policy.
 

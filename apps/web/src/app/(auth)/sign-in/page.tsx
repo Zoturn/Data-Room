@@ -20,7 +20,7 @@ export default function SignInPage() {
         </span>
         <h1 className="text-2xl font-semibold">Sign in</h1>
         <p className="text-sm text-muted-foreground">
-          Use your email and password, or continue with Google.
+          Use your email and password.
         </p>
       </div>
 

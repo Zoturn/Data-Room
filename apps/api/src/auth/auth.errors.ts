@@ -39,10 +39,9 @@ export class RefreshTokenAlreadyRotatedError extends Error {
 }
 
 /**
- * Sign-in refused. The *only* error the password login path raises, whatever went wrong:
- * no account with that address, the wrong password, or a password presented against an
- * account that only has Google. One message for all three, because a distinct "no account
- * with that email" turns the endpoint into a directory of who is registered — see
+ * Sign-in refused. The *only* error the login path raises, whatever went wrong: no account
+ * with that address, or the wrong password. One message for both, because a distinct "no
+ * account with that email" turns the endpoint into a directory of who is registered — see
  * apps/api/.claude/rules/auth-and-guards.md rule 4. `AuthService.login` keeps the *timing*
  * uniform as well; the wording alone is not enough.
  */
@@ -70,19 +69,5 @@ export class EmailAlreadyRegisteredError extends DomainError {
 
   constructor(message = "An account with that email address already exists.") {
     super(message);
-  }
-}
-
-/**
- * Google returned a profile whose address it has not verified. Refused, because linking is
- * done on the email: an unverified address is one the profile's owner typed, so accepting it
- * would let anyone claim any address and be linked into the account that owns it.
- */
-export class GoogleEmailNotVerifiedError extends DomainError {
-  readonly code = "INVALID_CREDENTIALS" as const;
-  readonly status = 401;
-
-  constructor() {
-    super("Your Google account's email address is not verified.");
   }
 }
