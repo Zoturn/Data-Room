@@ -14,9 +14,22 @@ Built for the GS1 full-stack take-home task.
 | Backend      | <https://data-room-production-1752.up.railway.app>            |
 | Health check | <https://data-room-production-1752.up.railway.app/api/health> |
 
-The frontend is deployed and rendering; sign-in and the Data Room itself arrive with
-`add-authentication` and the changes after it. A short tour of what to try first is added
-with the final change.
+### What to try first
+
+1. **Register** — any email and a password of eight characters or more. There is no email
+   confirmation step; the account is usable immediately.
+2. **Make a folder or two, and nest one inside another.** Try creating a second folder with the
+   same name — the conflict is refused with the name it collided with.
+3. **Drag a few PDFs onto the folder.** Each gets its own progress row. Dropping the same file
+   twice resolves to `name (1).pdf` rather than overwriting.
+4. **Open one**, rename it — the extension is not editable — then move it to another folder.
+5. **Delete a folder that has things in it.** The confirmation states the real counts from the
+   server before anything is destroyed.
+6. **Share the folder**, copy the link, and open it in a private window. You will see the shared
+   folder and everything under it, and no way to change any of it. Then revoke the share and
+   reload: it is gone on the next request.
+
+Only PDFs are accepted, up to 50 MB.
 
 ## What it does
 
@@ -24,7 +37,6 @@ with the final change.
 - **Files** — upload several PDFs at once by drag-and-drop with per-file progress, view them in the app, rename, move between folders, delete. Name conflicts resolve predictably.
 - **Sharing** — share the Data Room, a folder, or a single file, read-only, either as a public link or to named people who must sign in. Access covers everything nested inside. The owner can revoke at any time, immediately.
 - **Accounts** — email and password. A Data Room is invisible to everyone but its owner until it is shared.
-- **Extra credit** — filename search across the Data Room, and optional file versioning on a name conflict.
 
 ## Stack
 
