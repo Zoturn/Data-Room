@@ -4,7 +4,7 @@ A virtual Data Room: an owner keeps folders and PDF documents in a private repos
 
 Built for the GS1 full-stack take-home task.
 
-> **Status:** specification complete, implementation not started. Every section below marked _(pending)_ is written by the change that delivers it — see [Roadmap](#roadmap).
+> **Status:** authentication, folders, files and sharing are implemented and deployed. Search and versioning — the task's extra credit — were cut for time; see [Deliberate cuts](#deliberate-cuts).
 
 ## Hosted URLs
 
@@ -39,9 +39,7 @@ with the final change.
 
 ## Design decisions
 
-_(pending — assembled in `add-search-and-versioning` from the six change design documents in `openspec/changes/*/design.md`, which record every decision and the alternatives weighed against it.)_
-
-The short version, ahead of that write-up:
+Each of these is argued in full, with the alternatives weighed against it, in the design document of the change that made it: `openspec/changes/*/design.md`.
 
 - **One `Node` table for folders and files**, discriminated by type, so naming, listing, moving, deleting and sharing are each implemented once rather than twice.
 - **Materialised path of ids** on every node, so breadcrumbs, subtree aggregates, recursive delete, scoped search and permission inheritance are all one indexed prefix query — and a rename touches a single row.
@@ -50,9 +48,74 @@ The short version, ahead of that write-up:
 
 ## Data model
 
-_(pending — ERD added in `add-data-room-tree` and completed in `add-sharing` and `add-search-and-versioning`.)_
+```mermaid
+erDiagram
+    User ||--o{ RefreshToken : "has sessions"
+    User ||--|| DataRoom : owns
+    User ||--o{ ShareGrant : "is bound to"
+    DataRoom ||--o{ Node : contains
+    Node ||--o{ Node : "parent of"
+    Node ||--o{ Share : "is shared by"
+    Share ||--o{ ShareGrant : "names recipients"
 
-Entities: `User`, `RefreshToken`, `DataRoom`, `Node` (folder or file), `Share`, `ShareGrant`, `FileVersion`.
+    User {
+        uuid id PK
+        citext email UK
+        text passwordHash "null for Google-only"
+        text googleId UK "null, reserved"
+    }
+    RefreshToken {
+        uuid id PK
+        uuid familyId "rotation chain"
+        text tokenHash UK "sha-256, never the token"
+        timestamp familyStartedAt "absolute session cap"
+        uuid replacedById "reuse detection"
+    }
+    DataRoom {
+        uuid id PK
+        uuid ownerId UK "one room per owner"
+    }
+    Node {
+        uuid id PK
+        uuid parentId FK "null on the root"
+        enum type "FOLDER | FILE"
+        text name
+        text normalizedName "unique per parent"
+        text path "/rootId/childId/ - ids, not names"
+        int depth
+        bigint sizeBytes
+        text storageKey "dataRoomId/nodeId, files only"
+        enum uploadState "PENDING | READY, null on folders"
+    }
+    Share {
+        uuid id PK
+        uuid nodeId FK "folder, file, or the room's root"
+        enum mode "PUBLIC_LINK | RESTRICTED"
+        enum role "VIEWER"
+        text tokenHash UK "sha-256, never the token"
+        timestamp expiresAt "null = until revoked"
+        timestamp revokedAt "checked on every request"
+    }
+    ShareGrant {
+        uuid id PK
+        uuid shareId FK
+        citext email "invited before an account exists"
+        uuid userId FK "bound on first sign-in"
+        timestamp acceptedAt
+    }
+```
+
+Three things in that diagram carry most of the weight.
+
+**`Node` is one table for folders and files**, discriminated by `type`. Naming, listing, moving,
+deleting and sharing are each implemented once rather than twice, and a `Share` can point at a
+folder or a file without a polymorphic target.
+
+**`path` holds ancestor ids, not names.** It is what makes a subtree one indexed range scan, and
+it is why renaming a folder with fifty thousand descendants updates exactly one row.
+
+**The Data Room's root is a real `Node` row.** Sharing the whole room is therefore the same
+operation as sharing a folder — there is no second code path for it.
 
 ## How it scales
 
@@ -239,8 +302,55 @@ Conventions live in `.claude/rules/*.md` and load automatically for the files th
 
 ## Use of AI
 
-_(pending — the required note on where and how AI was used, written with the final change.)_
+This project was built with Claude Code, and the honest summary is that AI wrote nearly all of
+the code and none of the decisions that mattered.
+
+**How the work was structured.** Every feature started as an OpenSpec change — a proposal, a
+design document arguing the alternatives, a spec with testable scenarios, and a task list —
+reviewed before any code existed. That ordering is what made AI useful at this size: the
+specification is the thing under human control, and the implementation is the part that can be
+delegated and checked.
+
+**Where it was delegated.** Each change was built by several agents working in parallel against
+a written contract fixing the shared signatures — the zod schemas, the service interfaces, the
+routes — so four agents could touch four areas without inventing four versions of the same
+type. That contract was written by hand, after an attempt to have an agent produce it failed
+repeatedly.
+
+**Where it needed correcting.** Parallel agents reliably produce integration defects that no
+unit test catches, because each one is locally correct. Real examples from this repository:
+three agents independently defined the same error class; a controller was written and
+registered in no module, so an entire feature returned 404; a service gained a constructor
+dependency that seventy-two existing tests did not provide.
+
+**What the tests did not catch.** Two of the most serious defects were found by running the
+application, not by the suite. A `POST /files/:id/move` that failed on every call — Prisma binds
+a JS number as `bigint`, and Postgres has no `substring(text, bigint)` — while all 348 API tests
+passed, because they mock Prisma and the SQL never reached a database. And an entire end-to-end
+suite that had silently stopped running: a `tsconfig` inherited an `exclude` naming its own
+input directory, so the project had no files, and "0 failing" looked exactly like passing.
+
+**What AI was good at.** Volume with consistency — a data model, its migration, repository,
+service, controller and specs written to the same conventions across four features. Adversarial
+review was the other genuine win: a security pass over the authentication code found a login-CSRF
+hole, a sign-out that never revoked anything, and a rate limiter bucketing every caller into one
+counter, all while the suite was green.
+
+**What it was not good at.** Knowing when it was wrong. Every claim in this repository that
+something works was re-checked by running it, and that habit found defects in roughly every
+change. Several agent runs also consumed large amounts of work and reported nothing usable.
 
 ## Deliberate cuts
 
-_(pending — the list of things consciously left out, with reasons: no password reset or email verification, no email delivery of share invitations, no version retention policy, PDF only, no access logs.)_
+Left out on purpose, with the reason rather than an apology:
+
+| Cut | Why |
+| --- | --- |
+| **Search and file versioning** | The task marks both as extra credit. Specified in `add-search-and-versioning` and not built. |
+| **Google sign-in** | The task asks for Google *or* email/password. Email/password ships; the model already carries a unique nullable `googleId` and the account-linking rule, so adding it is a provider and a callback rather than a migration. |
+| **Password reset and email verification** | Both need transactional email, which is an integration rather than a feature of this product. |
+| **Emailing share invitations** | Same reason. A restricted share returns its link to the owner, who sends it however they already talk to that person. |
+| **Editor role** | `Share.role` and `ShareGrant.role` exist and the resolver already returns the most permissive match, so this is an enum value and a capability matrix — but a role enforced on some paths and not others is worse than no role, so it is deliberately unbuilt. See ["How it scales"](#how-it-scales). |
+| **Access logs** | A real data room records who opened what. It is a table and a write on the read path; nothing in the model resists it. |
+| **Throttling of share-token probing** | Tokens are 256 bits from a CSPRNG, so guessing is infeasible, and unknown, revoked and expired tokens are answered identically. A rate limit on the public surface is still the right belt-and-braces and is not implemented. |
+| **Some Cypress API and component specs** | The logic underneath each is covered by Jest and the journeys by end-to-end specs. Each cut is recorded, with its reason, in the `tasks.md` of the change that owns it. |
